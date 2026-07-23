@@ -26,6 +26,7 @@ const PREGUNTAS_INIT = [
   { id: 3, texto: "¿Instruyó sobre acciones comerciales vigentes?",  tipo: "bool" },
   { id: 4, texto: "¿Verificó stock y exhibición de productos?",      tipo: "bool" },
   { id: 5, texto: "Observaciones de la visita",                      tipo: "texto" },
+  { id: 6, texto: "Foto de mantenimiento / estado de la sucursal",   tipo: "foto" },
 ];
 
 const EQUIPO_INIT = [
@@ -106,6 +107,14 @@ const API = {
     await fetch('/.netlify/functions/visitas', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(v),
     });
+  },
+  async uploadFoto({ data, visitaId, sucursal, tipo }) {
+    const r = await fetch('/.netlify/functions/upload-foto', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data, visitaId, sucursal, tipo }),
+    });
+    if (!r.ok) throw new Error('Error al subir foto');
+    return r.json();
   },
   async getRegistros() {
     const r = await fetch('/.netlify/functions/registros');
@@ -240,6 +249,72 @@ const ProgressBar = ({ val, max }) => {
   );
 };
 
+
+// ─── FOTO UPLOADER ───────────────────────────────────────────────────────────
+function FotoUploader({ visitaId, sucursal, tipo, value, onChange }) {
+  const [subiendo, setSubiendo] = useState(false);
+  const [error, setError] = useState(null);
+
+  const handleFile = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setSubiendo(true); setError(null);
+    try {
+      const reader = new FileReader();
+      reader.onload = async (ev) => {
+        try {
+          const result = await API.uploadFoto({
+            data: ev.target.result,
+            visitaId: visitaId || Date.now(),
+            sucursal: sucursal || "sucursal",
+            tipo,
+          });
+          onChange(result.url);
+        } catch (err) {
+          setError("No se pudo subir la foto. Intentá de nuevo.");
+        } finally {
+          setSubiendo(false);
+        }
+      };
+      reader.readAsDataURL(file);
+    } catch {
+      setError("Error al leer el archivo.");
+      setSubiendo(false);
+    }
+  };
+
+  if (value) return (
+    <div style={{ position:"relative" }}>
+      <img src={value} alt="Foto adjunta" style={{ width:"100%", borderRadius:12, objectFit:"cover", maxHeight:200 }}/>
+      <button onClick={() => onChange(null)} style={{
+        position:"absolute", top:8, right:8, background:"rgba(0,0,0,0.55)", color:"#fff",
+        border:"none", borderRadius:20, padding:"4px 10px", fontSize:12, cursor:"pointer"
+      }}>✕ Cambiar</button>
+    </div>
+  );
+
+  return (
+    <div>
+      <label style={{
+        display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center",
+        gap:8, padding:"20px 16px", borderRadius:12, border:`2px dashed ${T.border}`,
+        background:T.inputBg, cursor:"pointer", color:T.muted,
+      }}>
+        <input type="file" accept="image/*" capture="environment" onChange={handleFile} style={{ display:"none" }}/>
+        {subiendo ? (
+          <div style={{ fontSize:13, color:T.primary }}>Subiendo foto…</div>
+        ) : (
+          <>
+            <span style={{ fontSize:28 }}>📷</span>
+            <span style={{ fontSize:13, fontWeight:600 }}>Tocar para sacar o adjuntar foto</span>
+          </>
+        )}
+      </label>
+      {error && <div style={{ fontSize:12, color:T.error, marginTop:6 }}>{error}</div>}
+    </div>
+  );
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // VISTA ADRIÁN
 // ══════════════════════════════════════════════════════════════════════════════
@@ -319,6 +394,14 @@ function VistaAdrian({ sucursales, preguntas, visitas, setVisitas }) {
                   }}>{op}</button>
                 ))}
               </div>
+            ) : p.tipo==="foto" ? (
+              <FotoUploader
+                visitaId={visitaActual?.id}
+                sucursal={visitaActual?.sucursalNombre}
+                tipo={"p"+p.id}
+                value={respuestas[p.id]}
+                onChange={url => setRespuestas(r => ({...r,[p.id]:url}))}
+              />
             ) : (
               <textarea rows={3} placeholder="Escribí tus observaciones..." value={respuestas[p.id]||""} onChange={e => setRespuestas(r => ({...r,[p.id]:e.target.value}))}
                 style={{ width:"100%", padding:"11px 13px", borderRadius:12, border:`1.5px solid ${T.border}`, background:T.inputBg, fontSize:14, color:T.text, outline:"none", fontFamily:F.body, resize:"vertical" }}/>
@@ -553,7 +636,7 @@ function HistorialPanel({ visitas, preguntas }) {
                     {preguntas.map(p=>{ const r=v.respuestas?.[p.id]; if(!r)return null; return (
                       <div key={p.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:8, fontSize:13 }}>
                         <span style={{ color:T.muted, flex:1, marginRight:8, lineHeight:1.4 }}>{p.texto}</span>
-                        {p.tipo==="bool"?<Badge color={r==="Sí"?"sage":"error"}>{r}</Badge>:<span style={{ fontStyle:"italic", color:T.text, maxWidth:"45%", textAlign:"right" }}>{r}</span>}
+                        {p.tipo==="bool"?<Badge color={r==="Sí"?"sage":"error"}>{r}</Badge>:p.tipo==="foto"?<a href={r} target="_blank" rel="noreferrer" style={{ color:T.primary, fontSize:12, fontWeight:600 }}>Ver foto 📷</a>:<span style={{ fontStyle:"italic", color:T.text, maxWidth:"45%", textAlign:"right" }}>{r}</span>}
                       </div>
                     );})}
                   </div>
@@ -695,8 +778,8 @@ function EncuestaPanel({ preguntas, setPreguntas }) {
         <div style={{ marginBottom:14 }}>
           <Label>Tipo de respuesta</Label>
           <div style={{ display:"flex", gap:8 }}>
-            {[["bool","Sí / No"],["texto","Texto libre"]].map(([v,l])=>(
-              <button key={v} onClick={()=>setTipo(v)} style={{ flex:1, padding:"9px 0", borderRadius:12, border:`2px solid ${tipo===v?T.primaryDeep:T.border}`, background:tipo===v?T.activeSoft:T.inputBg, color:tipo===v?T.primaryDeep:T.muted, fontWeight:700, cursor:"pointer", fontSize:13, fontFamily:F.body }}>{l}</button>
+            {[["bool","Sí / No"],["texto","Texto libre"],["foto","📷 Foto"]].map(([v,l])=>(
+              <button key={v} onClick={()=>setTipo(v)} style={{ flex:1, padding:"9px 0", borderRadius:12, border:`2px solid ${tipo===v?T.primaryDeep:T.border}`, background:tipo===v?T.activeSoft:T.inputBg, color:tipo===v?T.primaryDeep:T.muted, fontWeight:700, cursor:"pointer", fontSize:12, fontFamily:F.body }}>{l}</button>
             ))}
           </div>
         </div>
@@ -715,7 +798,7 @@ function EncuestaPanel({ preguntas, setPreguntas }) {
             </div>
           ) : (
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", gap:8 }}>
-              <div style={{ flex:1 }}><span style={{ fontSize:11, color:T.muted2, marginRight:5 }}>{i+1}.</span><span style={{ fontSize:14, color:T.text }}>{p.texto}</span><span style={{ marginLeft:8 }}><Badge color={p.tipo==="bool"?"sage":"amber"}>{p.tipo==="bool"?"Sí/No":"Texto"}</Badge></span></div>
+              <div style={{ flex:1 }}><span style={{ fontSize:11, color:T.muted2, marginRight:5 }}>{i+1}.</span><span style={{ fontSize:14, color:T.text }}>{p.texto}</span><span style={{ marginLeft:8 }}><Badge color={p.tipo==="bool"?"sage":p.tipo==="foto"?"terr":"amber"}>{p.tipo==="bool"?"Sí/No":p.tipo==="foto"?"📷 Foto":"Texto"}</Badge></span></div>
               <div style={{ display:"flex", gap:6, flexShrink:0 }}>
                 <BtnSm variant="ghost" onClick={()=>{ setEditandoId(p.id); setEditTexto(p.texto); }}>✏</BtnSm>
                 <BtnSm variant="danger" onClick={()=>setPreguntas(pp=>pp.filter(x=>x.id!==p.id))}>✕</BtnSm>
