@@ -3,13 +3,13 @@ import { useState } from "react";
 // ─── DATOS INICIALES ────────────────────────────────────────────────────────
 
 const SUCURSALES_INIT = [
-  { id: 1, nombre: "Bella Vita 1",  lat: -34.6150343, lng: -58.4328699 },
-  { id: 2, nombre: "Bella Vita 2",  lat: -34.5580079, lng: -58.4599135 },
-  { id: 3, nombre: "Bella Vita 3",  lat: -34.5836368, lng: -58.4209757 },
-  { id: 4, nombre: "Bella Vita 4",  lat: -34.511436,  lng: -58.4887857 },
-  { id: 5, nombre: "Bella Vita 5",  lat: -34.5731906, lng: -58.4814334 },
-  { id: 6, nombre: "Bella Vita 6",  lat: -34.6408629, lng: -58.5634681 },
-  { id: 7, nombre: "Bella Vita Victoria", lat: -34.447114786025985, lng: -58.5467312333035 },
+  { id: 1, nombre: "Caballito",    lat: -34.6150343, lng: -58.4328699 },
+  { id: 2, nombre: "Belgrano",     lat: -34.5580079, lng: -58.4599135 },
+  { id: 3, nombre: "Palermo",      lat: -34.5836368, lng: -58.4209757 },
+  { id: 4, nombre: "Olivos",       lat: -34.511436,  lng: -58.4887857 },
+  { id: 5, nombre: "Urquiza",      lat: -34.5731906, lng: -58.4814334 },
+  { id: 6, nombre: "Ramos Mejía",  lat: -34.6408629, lng: -58.5634681 },
+  { id: 7, nombre: "San Fernando", lat: -34.447114786025985, lng: -58.5467312333035 },
 ];
 
 const PREGUNTAS_INIT = [
