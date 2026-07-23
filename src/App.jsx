@@ -1025,7 +1025,6 @@ export default function App() {
       )}
     </div>
   );
-}}
 
 function duracion(entrada, salida) {
   if (!entrada || !salida) return null;
