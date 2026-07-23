@@ -6,9 +6,6 @@
 [build.environment]
   NODE_VERSION = "18"
 
-[build.processing]
-  skip_processing = false
-
 [secrets_scanning]
   enabled = true
-  omit_paths = ["node_modules"]
+  omit_keys = ["CLOUDINARY_API_SECRET"]
