@@ -3,13 +3,13 @@ import { useState } from "react";
 // ─── DATOS INICIALES ────────────────────────────────────────────────────────
 
 const SUCURSALES_INIT = [
-  { id: 1, nombre: "Sucursal Centro",        lat: -31.4167, lng: -64.1833 },
-  { id: 2, nombre: "Sucursal Nueva Córdoba", lat: -31.4278, lng: -64.1878 },
-  { id: 3, nombre: "Sucursal Güemes",        lat: -31.4100, lng: -64.1950 },
-  { id: 4, nombre: "Sucursal Cerro",         lat: -31.3950, lng: -64.2100 },
-  { id: 5, nombre: "Sucursal Norte",         lat: -31.3800, lng: -64.1700 },
-  { id: 6, nombre: "Sucursal Sur",           lat: -31.4500, lng: -64.1900 },
-  { id: 7, nombre: "Sucursal Este",          lat: -31.4200, lng: -64.1500 },
+  { id: 1, nombre: "Bella Vita 1",  lat: -34.6150343, lng: -58.4328699 },
+  { id: 2, nombre: "Bella Vita 2",  lat: -34.5580079, lng: -58.4599135 },
+  { id: 3, nombre: "Bella Vita 3",  lat: -34.5836368, lng: -58.4209757 },
+  { id: 4, nombre: "Bella Vita 4",  lat: -34.511436,  lng: -58.4887857 },
+  { id: 5, nombre: "Bella Vita 5",  lat: -34.5731906, lng: -58.4814334 },
+  { id: 6, nombre: "Bella Vita 6",  lat: -34.6408629, lng: -58.5634681 },
+  { id: 7, nombre: "Bella Vita Victoria", lat: -34.447114786025985, lng: -58.5467312333035 },
 ];
 
 const PREGUNTAS_INIT = [
