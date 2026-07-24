@@ -8,28 +8,15 @@ exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers, body: '' };
 
   try {
-    const { data, sucursal, tipo } = JSON.parse(event.body);
+    const { data, sucursal } = JSON.parse(event.body);
 
     const cloudName = 'ubed3xw1';
-    const apiKey = '759883733914895';
-    const apiSecret = process.env.CLOUDINARY_CRED || process.env.CLOUDINARY_API_SECRET;
-    const timestamp = Math.floor(Date.now() / 1000);
-    const folder = `bella-vita/${sucursal}`;
-
-    const crypto = require('crypto');
-    // String to sign: parámetros en orden alfabético + apiSecret al final
-    const strToSign = `folder=${folder}&timestamp=${timestamp}${apiSecret}`;
-    const signature = crypto.createHash('sha256').update(strToSign).digest('hex');
-
-    console.log('String to sign:', `folder=${folder}&timestamp=${timestamp}[SECRET]`);
-    console.log('Signature:', signature);
+    const uploadPreset = 'bella_vita_unsigned';
 
     const formData = [
       `file=${encodeURIComponent(data)}`,
-      `api_key=${apiKey}`,
-      `timestamp=${timestamp}`,
-      `signature=${signature}`,
-      `folder=${encodeURIComponent(folder)}`,
+      `upload_preset=${uploadPreset}`,
+      `folder=${encodeURIComponent('bella-vita/' + sucursal)}`,
     ].join('&');
 
     const response = await fetch(
@@ -38,7 +25,7 @@ exports.handler = async (event) => {
     );
 
     const result = await response.json();
-    console.log('Cloudinary response:', JSON.stringify(result));
+    console.log('Cloudinary response:', JSON.stringify(result).slice(0, 200));
 
     if (result.error) throw new Error(result.error.message);
 
