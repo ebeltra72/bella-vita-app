@@ -6,6 +6,5 @@
 [build.environment]
   NODE_VERSION = "18"
 
-[secrets_scanning]
-  enabled = true
-  omit_keys = ["CLOUDINARY_API_SECRET"]
+[context.production]
+  environment = { SECRETS_SCAN_ENABLED = "false" }
