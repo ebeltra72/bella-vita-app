@@ -38,6 +38,8 @@ exports.handler = async (event) => {
     );
 
     const result = await response.json();
+    
+    console.log('Cloudinary response:', JSON.stringify(result));
 
     if (result.error) throw new Error(result.error.message);
 
