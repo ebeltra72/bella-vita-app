@@ -1,11 +1,3 @@
-const cloudinary = require('cloudinary').v2;
-
-cloudinary.config({
-  cloud_name: 'ubed3xw1',
-  api_key: '759883733914895',
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
-
 exports.handler = async (event) => {
   const headers = {
     'Access-Control-Allow-Origin': '*',
@@ -17,11 +9,38 @@ exports.handler = async (event) => {
 
   try {
     const { data, visitaId, sucursal, tipo } = JSON.parse(event.body);
-    const result = await cloudinary.uploader.upload(data, {
-      folder: `bella-vita/${sucursal}`,
-      public_id: `${visitaId}_${tipo}_${Date.now()}`,
-      resource_type: 'image',
-    });
+
+    const cloudName = 'ubed3xw1';
+    const apiKey = '759883733914895';
+    const apiSecret = process.env.CLOUDINARY_CRED || process.env.CLOUDINARY_API_SECRET;
+    const timestamp = Math.floor(Date.now() / 1000);
+    const folder = `bella-vita/${sucursal}`;
+    const publicId = `${visitaId}_${tipo}_${timestamp}`;
+
+    // Firma para Cloudinary
+    const crypto = require('crypto');
+    const strToSign = `folder=${folder}&public_id=${publicId}&timestamp=${timestamp}${apiSecret}`;
+    const signature = crypto.createHash('sha256').update(strToSign).digest('hex');
+
+    // Subir via API REST de Cloudinary
+    const formData = [
+      `file=${encodeURIComponent(data)}`,
+      `api_key=${apiKey}`,
+      `timestamp=${timestamp}`,
+      `signature=${signature}`,
+      `folder=${encodeURIComponent(folder)}`,
+      `public_id=${encodeURIComponent(publicId)}`,
+    ].join('&');
+
+    const response = await fetch(
+      `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
+      { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: formData }
+    );
+
+    const result = await response.json();
+
+    if (result.error) throw new Error(result.error.message);
+
     return {
       statusCode: 200, headers,
       body: JSON.stringify({ url: result.secure_url, public_id: result.public_id }),
