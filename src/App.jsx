@@ -389,7 +389,16 @@ function InventarioForm({ visitaActual, inventariosExistentes }) {
           <input
             type="number" min="0" step="0.5" placeholder="0"
             value={cantidades[prod] || ""}
-            onChange={e => setCantidades(c => ({ ...c, [prod]: e.target.value }))}
+            onChange={e => {
+              const val = e.target.value;
+              if (val === "") {
+                const next = { ...cantidades };
+                delete next[prod];
+                setCantidades(next);
+              } else {
+                setCantidades(c => ({ ...c, [prod]: val }));
+              }
+            }}
             style={{
               width: 70, padding: "6px 8px", borderRadius: 8,
               border: `1.5px solid ${cantidades[prod] ? T.primary : T.border}`,
@@ -402,7 +411,10 @@ function InventarioForm({ visitaActual, inventariosExistentes }) {
       ))}
 
       <div style={{ marginTop: 16 }}>
-        <Btn variant="primary" disabled={guardando || Object.keys(cantidades).length === 0} onClick={guardar}>
+        <div style={{ fontSize:12, color:T.muted, marginTop:8, marginBottom:12 }}>
+          Podés dejar en blanco los productos que no revisaste. Los que pongas en 0 también quedan registrados.
+        </div>
+        <Btn variant="primary" disabled={guardando} onClick={guardar}>
           {guardando ? "Guardando…" : `Guardar inventario de ${rubroAsignado}`}
         </Btn>
       </div>
