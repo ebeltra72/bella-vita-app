@@ -30,9 +30,9 @@ const PREGUNTAS_INIT = [
 ];
 
 const EQUIPO_INIT = [
-  { id: "camila", nombre: "Camila",  rol: "Gestión comercial" },
-  { id: "sasha",  nombre: "Sasha",   rol: "Gestión comercial" },
-  { id: "braian", nombre: "Braian",  rol: "Gestión comercial (remoto)" },
+  { id: "sasha",  nombre: "Sasha",   rol: "Gestión comercial", enRanking: true },
+  { id: "braian", nombre: "Braian",  rol: "Gestión comercial (remoto)", enRanking: true },
+  { id: "camila", nombre: "Camila",  rol: "Gestión comercial", enRanking: false },
 ];
 
 const META_INIT = { mensajes: 50, turnos: 30, senias: 10, premioPorSenia: 500 };
@@ -129,6 +129,17 @@ const API = {
   async saveRegistro(r) {
     await fetch('/.netlify/functions/registros', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(r),
+    });
+  },
+  async getInventarios(sucursalId) {
+    const url = sucursalId ? `/.netlify/functions/inventarios?sucursal_id=${sucursalId}` : '/.netlify/functions/inventarios';
+    const r = await fetch(url);
+    if (!r.ok) throw new Error('Error al cargar inventarios');
+    return r.json();
+  },
+  async saveInventario(inv) {
+    await fetch('/.netlify/functions/inventarios', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(inv),
     });
   },
 };
@@ -250,6 +261,155 @@ const ProgressBar = ({ val, max }) => {
 };
 
 
+
+// ─── CATÁLOGO DE PRODUCTOS ────────────────────────────────────────────────────
+const CATALOGO = {
+  "General": [
+    "Antigrasa", "Blem", "Cif baño", "Detergente", "Harpic Sarro",
+    "Lavandina", "Lavandina en gel", "Lavandina ropa blanca", "Vivere suavizante",
+    "Cif", "Limpiavidrios", "Líquido de pisos", "Gel inodoro", "Bolsa basura (rollo)",
+    "Jabón manos", "Jabón ropa", "Desodorante ambiente", "Papel higiénico (pack 4)",
+  ],
+  "Depilación": [
+    "Rollos de cocina (pack 3)", "Platsul", "Alcohol 5 lts", "Cintas (cajita x 12 u.)",
+    "Guantes", "Rollo Cocina indiv. grande", "Gel bolsa",
+  ],
+  "Médico": [
+    "Aceite Johnson's", "Alcohol chiquito", "Crema anestésica", "Hyaluromax Bioestimulador",
+    "LongLasting", "Jabón Clorhexidina", "Ampolla Meso Estrías", "Ampolla Meso Facial",
+    "Cánula 25G", "Agujas dermapen", "Jeringa 21G Butterfly", "Jeringa 10ml+aguja",
+    "Aguja Bótox", "Aguja intradérmica", "Jeringa Luer Lock 10ml", "Jeringa Luer Lock 5ml",
+    "Llave 3 vías", "Solución fisiológica 10ml", "Aguja 21G", "Jeringa 1ml con aguja",
+    "Jeringa 1ml", "Tubo citrato", "Radiesse", "Xeomin Bótox", "Belotero Intense (labios)",
+    "Exosomas", "PDRN", "Hialuronidasa",
+  ],
+  "Limpiezas y masajes": [
+    "Aceite masajes 1lt", "Ácido láctico corporal", "Crema corporal", "Crema masaje",
+    "Scrub corporal", "Agua Oxigenada", "ADN gel", "Matt Balance gel", "Agua micelar",
+    "Leche limpieza", "Loción hierbas/refrescante", "Serum hialurónico Lidherma",
+    "Gasas", "Jabón blanco", "Agujas 21G 1½", "Pastilla papel facial",
+    "Máscara abrasiva", "Peptisomas", "Máscara descongestiva", "Peeling enzimático",
+    "Máscara Vit C", "Crema antiage radiofrecuencia", "Protector solar",
+    "Acnex Depure", "Serum Hialurónico c/Niacinamida", "Ac. Glicólico", "Ac. Lactobiónico",
+  ],
+};
+
+// Calcula qué rubro corresponde esta semana del mes (1-4)
+// y si ya se hizo ese control en esta sucursal esta semana
+function rubroSemanaActual() {
+  const hoyDate = new Date();
+  const semanaDelMes = Math.ceil(hoyDate.getDate() / 7);
+  const rubros = ["General", "Depilación", "Médico", "Limpiezas y masajes"];
+  return rubros[(semanaDelMes - 1) % 4];
+}
+
+function semanaKey() {
+  // Clave única para semana del año + año (ej: "2026-W30")
+  const now = new Date();
+  const start = new Date(now.getFullYear(), 0, 1);
+  const semana = Math.ceil(((now - start) / 86400000 + start.getDay() + 1) / 7);
+  return `${now.getFullYear()}-W${semana}`;
+}
+
+const RUBRO_ICONOS = {
+  "General": "🧹",
+  "Depilación": "✨",
+  "Médico": "💉",
+  "Limpiezas y masajes": "🧴",
+};
+
+// ─── COMPONENTE INVENTARIO ────────────────────────────────────────────────────
+function InventarioForm({ visitaActual, inventariosExistentes }) {
+  const rubroAsignado = rubroSemanaActual();
+  const semana = semanaKey();
+
+  // ¿Ya se hizo el control de este rubro esta semana en esta sucursal?
+  const yaHecho = inventariosExistentes?.some(inv =>
+    inv.sucursalId === visitaActual?.sucursalId &&
+    inv.rubro === rubroAsignado &&
+    inv.semanaKey === semana
+  );
+
+  const [cantidades, setCantidades] = useState({});
+  const [guardando, setGuardando] = useState(false);
+  const [guardado, setGuardado] = useState(false);
+
+  const productos = CATALOGO[rubroAsignado] || [];
+
+  const guardar = async () => {
+    setGuardando(true);
+    try {
+      await API.saveInventario({
+        id: Date.now(),
+        visitaId: visitaActual?.id,
+        sucursalId: visitaActual?.sucursalId,
+        sucursalNombre: visitaActual?.sucursalNombre,
+        fecha: hoy(),
+        rubro: rubroAsignado,
+        semanaKey: semana,
+        productos: cantidades,
+      });
+      setGuardado(true);
+    } catch (e) {
+      console.error(e);
+    }
+    setGuardando(false);
+  };
+
+  if (guardado || yaHecho) return (
+    <div style={{ background: T.sageBg, borderRadius: 14, padding: 16 }}>
+      <div style={{ fontWeight: 700, fontSize: 14, color: T.sage, marginBottom: 4 }}>
+        ✓ Control de {rubroAsignado} completado esta semana
+      </div>
+      <div style={{ fontSize: 12, color: T.muted }}>
+        {guardado ? "Guardado recién" : "Ya lo hiciste en una visita anterior"}
+      </div>
+    </div>
+  );
+
+  return (
+    <div>
+      {/* Encabezado con rubro asignado */}
+      <div style={{ background: T.activeSoft, borderRadius: 12, padding: "12px 14px", marginBottom: 14 }}>
+        <div style={{ fontSize: 11, color: T.muted, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 4 }}>
+          Rubro de esta semana
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 22 }}>{RUBRO_ICONOS[rubroAsignado]}</span>
+          <span style={{ fontFamily: F.serif, fontSize: 20, fontWeight: 700, color: T.primaryDeep }}>{rubroAsignado}</span>
+        </div>
+      </div>
+
+      {productos.map(prod => (
+        <div key={prod} style={{
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          padding: "10px 0", borderBottom: `1px solid ${T.divider}`,
+        }}>
+          <span style={{ fontSize: 13, color: T.text, flex: 1, marginRight: 12 }}>{prod}</span>
+          <input
+            type="number" min="0" step="0.5" placeholder="0"
+            value={cantidades[prod] || ""}
+            onChange={e => setCantidades(c => ({ ...c, [prod]: e.target.value }))}
+            style={{
+              width: 70, padding: "6px 8px", borderRadius: 8,
+              border: `1.5px solid ${cantidades[prod] ? T.primary : T.border}`,
+              fontSize: 14, textAlign: "center", fontFamily: F.body,
+              background: cantidades[prod] ? T.activeSoft : T.inputBg,
+              color: T.text, outline: "none",
+            }}
+          />
+        </div>
+      ))}
+
+      <div style={{ marginTop: 16 }}>
+        <Btn variant="primary" disabled={guardando || Object.keys(cantidades).length === 0} onClick={guardar}>
+          {guardando ? "Guardando…" : `Guardar inventario de ${rubroAsignado}`}
+        </Btn>
+      </div>
+    </div>
+  );
+}
+
 // ─── FOTO UPLOADER ───────────────────────────────────────────────────────────
 function FotoUploader({ visitaId, sucursal, tipo, value, onChange }) {
   const [subiendo, setSubiendo] = useState(false);
@@ -324,6 +484,7 @@ function VistaAdrian({ sucursales, preguntas, visitas, setVisitas }) {
   const [visitaActual, setVisitaActual] = useState(null);
   const [respuestas, setRespuestas] = useState({});
   const [guardando, setGuardando] = useState(false);
+  const [inventariosVisita, setInventariosVisita] = useState([]);
   const { loading, error, sinPermiso, setSinPermiso, obtener, simular } = useGPS();
   const sucursal = sucursales.find(x => x.id===Number(sucursalId));
 
@@ -338,7 +499,18 @@ function VistaAdrian({ sucursales, preguntas, visitas, setVisitas }) {
       gpsOkCheckin:dist<=RADIO_ACEPTADO_M, gpsOkCheckout:null,
       simulado:coords.simulado||false, respuestas:{},
     });
-    setRespuestas({}); setFase("encuesta");
+    setRespuestas({});
+    // Cargar inventarios de esta sucursal para saber si ya se hizo el rubro esta semana
+    API.getInventarios(sucursal?.id)
+      .then(rows => setInventariosVisita(rows.map(r => ({
+        id: r.id,
+        sucursalId: r.sucursal_id,
+        rubro: r.rubro,
+        semanaKey: r.semana_key,
+        fecha: r.fecha,
+      }))))
+      .catch(() => {});
+    setFase("encuesta");
   };
 
   const registrarCheckout = async (coords) => {
@@ -410,6 +582,12 @@ function VistaAdrian({ sucursales, preguntas, visitas, setVisitas }) {
         ))}
       </Card>
 
+      {/* INVENTARIO */}
+      <Card>
+        <div style={{ fontWeight:700, fontSize:14, color:T.primaryDeep, marginBottom:14 }}>📦 Control de inventario</div>
+        <InventarioForm visitaActual={visitaActual} inventariosExistentes={inventariosVisita} />
+      </Card>
+
       {error && <div style={{ background:T.errorBg, color:T.error, borderRadius:12, padding:"12px 14px", fontSize:13, marginBottom:12 }}>⚠ GPS: {error}</div>}
 
       {sinPermiso ? (
@@ -473,10 +651,113 @@ function VistaAdrian({ sucursales, preguntas, visitas, setVisitas }) {
   );
 }
 
+
+// ─── RANKING ─────────────────────────────────────────────────────────────────
+function RankingEquipo({ equipo, registros, meta }) {
+  const mes = mesActual();
+  const regMes = registros.filter(r => r.fecha?.startsWith(mes));
+  
+  const competidores = equipo
+    .filter(m => m.enRanking)
+    .map(m => {
+      const regs = regMes.filter(r => r.personaId === m.id);
+      const senias = regs.reduce((a, r) => a + r.senias, 0);
+      const turnos = regs.reduce((a, r) => a + r.turnos, 0);
+      const premio = Math.max(0, senias - meta.senias) * meta.premioPorSenia;
+      const pct = meta.senias > 0 ? Math.min(100, (senias / meta.senias) * 100) : 0;
+      return { ...m, senias, turnos, premio, pct, dias: regs.length };
+    })
+    .sort((a, b) => b.senias - a.senias);
+
+  const medallas = ["🥇", "🥈", "🥉"];
+  const bgPodio = [T.goldSoft, "#F0EEEB", "#F5EDE8"];
+  const colorPodio = [T.gold, T.muted, T.primary];
+
+  if (competidores.length === 0) return (
+    <div style={{ textAlign:"center", color:T.muted, padding:32 }}>
+      Sin datos este mes todavía.
+    </div>
+  );
+
+  return (
+    <div>
+      <div style={{ fontFamily:F.serif, fontSize:22, fontWeight:700, color:T.primaryDeep, marginBottom:4 }}>
+        Ranking del mes 🏆
+      </div>
+      <div style={{ color:T.muted, fontSize:13, marginBottom:18 }}>
+        {new Date().toLocaleDateString("es-AR", { month:"long", year:"numeric" })}
+      </div>
+
+      {/* Podio */}
+      <div style={{ display:"flex", gap:10, marginBottom:16 }}>
+        {competidores.map((p, i) => (
+          <div key={p.id} style={{
+            flex:1, background:bgPodio[i]||T.cardSoft, borderRadius:18,
+            padding:"18px 12px", textAlign:"center",
+            border:`2px solid ${i===0?T.gold:T.border}`,
+            boxShadow:i===0?T.shadowBtn:"none",
+          }}>
+            <div style={{ fontSize:28, marginBottom:6 }}>{medallas[i]||"🎯"}</div>
+            <div style={{ fontFamily:F.serif, fontSize:18, fontWeight:700, color:colorPodio[i]||T.text }}>
+              {p.nombre}
+            </div>
+            <div style={{ fontFamily:F.serif, fontSize:32, fontWeight:700, color:colorPodio[i]||T.text, lineHeight:1, margin:"8px 0" }}>
+              {p.senias}
+            </div>
+            <div style={{ fontSize:11, color:T.muted, fontWeight:600, textTransform:"uppercase", letterSpacing:"0.5px" }}>
+              señas
+            </div>
+            {p.premio > 0 && (
+              <div style={{ marginTop:10, background:T.white, borderRadius:10, padding:"6px 8px" }}>
+                <div style={{ fontSize:11, color:T.muted }}>Premio</div>
+                <div style={{ fontFamily:F.serif, fontSize:16, fontWeight:700, color:T.gold }}>
+                  ${p.premio.toLocaleString("es-AR")}
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Detalle con barra de progreso */}
+      {competidores.map((p, i) => {
+        const siguiente = competidores[i-1];
+        const diferencia = siguiente ? siguiente.senias - p.senias : null;
+        return (
+          <div key={p.id} style={{ background:T.card, borderRadius:14, padding:"14px 16px", marginBottom:10, boxShadow:T.shadowList }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
+              <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                <span style={{ fontSize:20 }}>{medallas[i]||"🎯"}</span>
+                <div>
+                  <div style={{ fontWeight:700, fontSize:14, color:T.text }}>{p.nombre}</div>
+                  <div style={{ fontSize:11, color:T.muted }}>{p.dias} días cargados</div>
+                </div>
+              </div>
+              <div style={{ textAlign:"right" }}>
+                <div style={{ fontFamily:F.serif, fontSize:20, fontWeight:700, color:colorPodio[i]||T.text }}>{p.senias} señas</div>
+                {diferencia !== null && diferencia > 0 && (
+                  <div style={{ fontSize:11, color:T.error }}>a {diferencia} de {competidores[i-1].nombre}</div>
+                )}
+                {i === 0 && <div style={{ fontSize:11, color:T.sage }}>¡Líder del mes!</div>}
+              </div>
+            </div>
+            <ProgressBar val={p.senias} max={meta.senias}/>
+            <div style={{ display:"flex", justifyContent:"space-between", fontSize:11, color:T.muted, marginTop:4 }}>
+              <span>Meta: {meta.senias} señas</span>
+              <span>{p.pct.toFixed(0)}%</span>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // VISTA EQUIPO
 // ══════════════════════════════════════════════════════════════════════════════
-function VistaEquipo({ equipo, registros, setRegistros }) {
+function VistaEquipo({ equipo, registros, setRegistros, meta }) {
+  const [tab, setTab] = useState("carga"); // carga | ranking
   const [persona, setPersona] = useState("");
   const [form, setForm] = useState({ mensajes:"", turnos:"", senias:"", nota:"" });
   const [guardado, setGuardado] = useState(false);
@@ -517,6 +798,23 @@ function VistaEquipo({ equipo, registros, setRegistros }) {
 
   return (
     <div style={{ padding:"18px 16px" }}>
+      {/* Tabs */}
+      <div style={{ display:"flex", gap:8, marginBottom:20 }}>
+        {[["carga","📝 Mis números"],["ranking","🏆 Ranking"]].map(([t,l])=>(
+          <button key={t} onClick={()=>setTab(t)} style={{
+            flex:1, padding:"10px 0", borderRadius:12, border:"none", cursor:"pointer",
+            fontFamily:F.body, fontSize:13, fontWeight:700,
+            background:tab===t?T.gold:T.goldSoft,
+            color:tab===t?T.white:T.gold,
+            boxShadow:tab===t?T.shadowBtn:"none",
+            transition:"all .15s",
+          }}>{l}</button>
+        ))}
+      </div>
+
+      {tab==="ranking" && <RankingEquipo equipo={equipo} registros={registros} meta={meta}/>}
+
+      {tab==="carga" && <>
       <div style={{ fontFamily:F.serif, fontSize:26, fontWeight:700, color:T.gold, marginBottom:4 }}>Equipo comercial 💼</div>
       <div style={{ color:T.muted, fontSize:14, marginBottom:18 }}>Cargá tus números del día.</div>
 
@@ -570,6 +868,7 @@ function VistaEquipo({ equipo, registros, setRegistros }) {
           </Btn>
         </Card>
       )}
+      </>}
     </div>
   );
 }
@@ -881,6 +1180,182 @@ function KmPanel({ visitas }) {
   );
 }
 
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// PANEL ILEANA – INVENTARIO
+// ══════════════════════════════════════════════════════════════════════════════
+function InventarioPanel() {
+  const [inventarios, setInventarios] = useState([]);
+  const [cargando, setCargando] = useState(true);
+  const [filtroSuc, setFiltroSuc] = useState("");
+  const [filtroRubro, setFiltroRubro] = useState("");
+  const [expandido, setExpandido] = useState(null);
+
+  useEffect(() => {
+    API.getInventarios()
+      .then(rows => setInventarios(rows.map(r => ({
+        id: r.id,
+        visitaId: r.visita_id,
+        sucursalId: r.sucursal_id,
+        sucursalNombre: r.sucursal_nombre,
+        fecha: r.fecha?.slice(0, 10),
+        rubro: r.rubro,
+        productos: r.productos || {},
+        creadoEn: r.creado_en,
+      }))))
+      .catch(() => {})
+      .finally(() => setCargando(false));
+  }, []);
+
+  const sucursalesUnicas = [...new Set(inventarios.map(i => i.sucursalNombre))].filter(Boolean);
+  const rubrosUnicos = [...new Set(inventarios.map(i => i.rubro))].filter(Boolean);
+
+  const lista = inventarios.filter(i => {
+    if (filtroSuc && i.sucursalNombre !== filtroSuc) return false;
+    if (filtroRubro && i.rubro !== filtroRubro) return false;
+    return true;
+  }).sort((a, b) => b.fecha?.localeCompare(a.fecha));
+
+  if (cargando) return <div style={{ textAlign:"center", padding:40, color:T.muted }}>Cargando…</div>;
+
+  return (
+    <div style={{ padding:"18px 16px" }}>
+      {/* Resumen */}
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:16 }}>
+        <div style={{ background:T.card, borderRadius:14, padding:"14px 12px", textAlign:"center", boxShadow:T.shadowCard }}>
+          <div style={{ fontFamily:F.serif, fontSize:28, fontWeight:700, color:T.primaryDeep }}>{inventarios.length}</div>
+          <div style={{ fontSize:11, color:T.muted, fontWeight:600, textTransform:"uppercase", letterSpacing:"0.5px" }}>Controles</div>
+        </div>
+        <div style={{ background:T.card, borderRadius:14, padding:"14px 12px", textAlign:"center", boxShadow:T.shadowCard }}>
+          <div style={{ fontFamily:F.serif, fontSize:28, fontWeight:700, color:T.primaryDeep }}>{sucursalesUnicas.length}</div>
+          <div style={{ fontSize:11, color:T.muted, fontWeight:600, textTransform:"uppercase", letterSpacing:"0.5px" }}>Sucursales</div>
+        </div>
+      </div>
+
+      {/* Filtros */}
+      <div style={{ display:"flex", gap:8, marginBottom:14 }}>
+        <select value={filtroSuc} onChange={e=>setFiltroSuc(e.target.value)} style={{ flex:1, padding:"9px 11px", borderRadius:12, border:`1.5px solid ${T.border}`, background:T.inputBg, fontSize:12, color:T.text, outline:"none", fontFamily:F.body }}>
+          <option value="">Todas las sucursales</option>
+          {sucursalesUnicas.map(s => <option key={s}>{s}</option>)}
+        </select>
+        <select value={filtroRubro} onChange={e=>setFiltroRubro(e.target.value)} style={{ flex:1, padding:"9px 11px", borderRadius:12, border:`1.5px solid ${T.border}`, background:T.inputBg, fontSize:12, color:T.text, outline:"none", fontFamily:F.body }}>
+          <option value="">Todos los rubros</option>
+          {rubrosUnicos.map(r => <option key={r}>{r}</option>)}
+        </select>
+      </div>
+
+      {lista.length === 0 && <div style={{ textAlign:"center", color:T.muted, padding:32 }}>Sin controles de inventario todavía.</div>}
+
+      {lista.map(inv => {
+        const open = expandido === inv.id;
+        const productos = inv.productos || {};
+        const cantProductos = Object.keys(productos).length;
+        return (
+          <div key={inv.id} style={{ background:T.card, borderRadius:16, boxShadow:T.shadowList, marginBottom:10, overflow:"hidden" }}>
+            <div style={{ padding:"13px 16px", cursor:"pointer", display:"flex", justifyContent:"space-between", alignItems:"center" }}
+              onClick={() => setExpandido(open ? null : inv.id)}>
+              <div>
+                <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:2 }}>
+                  <span style={{ fontSize:16 }}>{RUBRO_ICONOS[inv.rubro] || "📦"}</span>
+                  <span style={{ fontWeight:700, fontSize:14, color:T.text }}>{inv.rubro}</span>
+                </div>
+                <div style={{ fontSize:12, color:T.muted }}>
+                  {inv.sucursalNombre} · {fmtFecha(inv.fecha)} · {cantProductos} productos
+                </div>
+              </div>
+              <span style={{ color:T.muted2 }}>{open ? "▲" : "▼"}</span>
+            </div>
+
+            {open && (
+              <div style={{ borderTop:`1px solid ${T.divider}`, padding:"12px 16px", background:T.cardSoft }}>
+                {Object.entries(productos).map(([prod, cant]) => (
+                  <div key={prod} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"7px 0", borderBottom:`1px solid ${T.divider}` }}>
+                    <span style={{ fontSize:13, color:T.text }}>{prod}</span>
+                    <span style={{ fontFamily:F.serif, fontSize:16, fontWeight:700, color: Number(cant) === 0 ? T.error : T.primaryDeep }}>
+                      {cant}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// PANEL ILEANA – MIEMBROS DEL EQUIPO
+// ══════════════════════════════════════════════════════════════════════════════
+function MiembrosPanel({ equipo, setEquipo }) {
+  const [nuevo, setNuevo] = useState({ nombre:"", rol:"Gestión comercial", enRanking:true });
+
+  const agregar = () => {
+    if (!nuevo.nombre.trim()) return;
+    const id = nuevo.nombre.toLowerCase().replace(/\s+/g, "-") + "-" + Date.now();
+    setEquipo(e => [...e, { id, ...nuevo, nombre:nuevo.nombre.trim() }]);
+    setNuevo({ nombre:"", rol:"Gestión comercial", enRanking:true });
+  };
+
+  const toggleRanking = (id) => {
+    setEquipo(e => e.map(m => m.id===id ? {...m, enRanking:!m.enRanking} : m));
+  };
+
+  const eliminar = (id) => {
+    setEquipo(e => e.filter(m => m.id!==id));
+  };
+
+  return (
+    <div style={{ padding:"18px 16px" }}>
+      <Card>
+        <div style={{ fontFamily:F.serif, fontSize:18, fontWeight:700, color:T.primaryDeep, marginBottom:14 }}>Agregar miembro</div>
+        <div style={{ marginBottom:12 }}>
+          <Label>Nombre</Label>
+          <Input placeholder="Ej: Laura" value={nuevo.nombre} onChange={e=>setNuevo(n=>({...n,nombre:e.target.value}))}/>
+        </div>
+        <div style={{ marginBottom:14 }}>
+          <Label>Rol</Label>
+          <Input placeholder="Gestión comercial" value={nuevo.rol} onChange={e=>setNuevo(n=>({...n,rol:e.target.value}))}/>
+        </div>
+        <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:16 }}>
+          <button onClick={()=>setNuevo(n=>({...n,enRanking:!n.enRanking}))} style={{
+            width:44, height:24, borderRadius:12, border:"none", cursor:"pointer",
+            background:nuevo.enRanking?T.gold:T.border, transition:"background .2s", position:"relative",
+          }}>
+            <div style={{ width:18, height:18, borderRadius:"50%", background:T.white, position:"absolute", top:3, transition:"left .2s", left:nuevo.enRanking?22:3 }}/>
+          </button>
+          <span style={{ fontSize:13, color:T.text }}>Incluir en el ranking</span>
+        </div>
+        <Btn onClick={agregar} disabled={!nuevo.nombre.trim()}>+ Agregar miembro</Btn>
+      </Card>
+
+      <Label>Miembros actuales ({equipo.length})</Label>
+      {equipo.map(m => (
+        <div key={m.id} style={{ background:T.card, borderRadius:14, padding:"13px 16px", boxShadow:T.shadowList, marginBottom:10 }}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+            <div>
+              <div style={{ fontWeight:700, fontSize:14, color:T.text }}>{m.nombre}</div>
+              <div style={{ fontSize:12, color:T.muted }}>{m.rol}</div>
+            </div>
+            <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+              <button onClick={()=>toggleRanking(m.id)} style={{
+                width:44, height:24, borderRadius:12, border:"none", cursor:"pointer",
+                background:m.enRanking?T.gold:T.border, transition:"background .2s", position:"relative",
+              }}>
+                <div style={{ width:18, height:18, borderRadius:"50%", background:T.white, position:"absolute", top:3, transition:"left .2s", left:m.enRanking?22:3 }}/>
+              </button>
+              <BtnSm variant="danger" onClick={()=>eliminar(m.id)}>✕</BtnSm>
+            </div>
+          </div>
+          {m.enRanking && <div style={{ marginTop:8 }}><Badge color="gold">🏆 En ranking</Badge></div>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // ROOT
 // ══════════════════════════════════════════════════════════════════════════════
@@ -889,7 +1364,7 @@ export default function App() {
   const [tabIleana, setTabIleana] = useState("historial");
   const [preguntas,  setPreguntas]  = useLocalStorage("bv_preguntas",  PREGUNTAS_INIT);
   const [sucursales, setSucursales] = useLocalStorage("bv_sucursales", SUCURSALES_INIT);
-  const [equipo]                    = useLocalStorage("bv_equipo",     EQUIPO_INIT);
+  const [equipo, setEquipo]         = useLocalStorage("bv_equipo",     EQUIPO_INIT);
   const [meta,       setMeta]       = useLocalStorage("bv_meta",       META_INIT);
   const [visitas,    setVisitas]    = useState([]);
   const [registros,  setRegistros]  = useState([]);
@@ -903,7 +1378,7 @@ export default function App() {
   }, []);
 
   const VISTAS = [["adrian","🗺 Adrián"],["equipo","💼 Equipo"],["ileana","👩‍💼 Ileana"]];
-  const TABS   = [["historial","📋 Visitas"],["gestion","💜 Comercial"],["encuesta","📝 Encuesta"],["sucursales","📍 Sucursales"],["km","🚗 Km"]];
+  const TABS   = [["historial","📋 Visitas"],["gestion","💜 Comercial"],["inventario","📦 Stock"],["encuesta","📝 Encuesta"],["sucursales","📍 Sucursales"],["km","🚗 Km"],["miembros","👥 Equipo"]];
 
   return (
     <div style={{ minHeight:"100vh", background:T.bgApp, fontFamily:F.body, color:T.text, WebkitFontSmoothing:"antialiased" }}>
@@ -940,7 +1415,7 @@ export default function App() {
       )}
 
       {!cargando && vista==="adrian" && <VistaAdrian sucursales={sucursales} preguntas={preguntas} visitas={visitas} setVisitas={setVisitas}/>}
-      {!cargando && vista==="equipo" && <VistaEquipo equipo={equipo} registros={registros} setRegistros={setRegistros}/>}
+      {!cargando && vista==="equipo" && <VistaEquipo equipo={equipo} registros={registros} setRegistros={setRegistros} meta={meta}/>}
       {!cargando && vista==="ileana" && (
         <>
           <div style={{ background:T.white, borderBottom:`1px solid ${T.divider}`, padding:"0 14px", display:"flex", gap:2, overflowX:"auto", position:"sticky", top:84, zIndex:99 }}>
@@ -959,6 +1434,8 @@ export default function App() {
           {tabIleana==="encuesta"   && <EncuestaPanel preguntas={preguntas} setPreguntas={setPreguntas}/>}
           {tabIleana==="sucursales" && <SucursalesPanel sucursales={sucursales} setSucursales={setSucursales}/>}
           {tabIleana==="km"         && <KmPanel visitas={visitas}/>}
+          {tabIleana==="inventario"  && <InventarioPanel/>}
+          {tabIleana==="miembros"    && <MiembrosPanel equipo={equipo} setEquipo={setEquipo}/>}
         </>
       )}
     </div>
