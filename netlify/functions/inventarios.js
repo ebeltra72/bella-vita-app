@@ -40,13 +40,14 @@ exports.handler = async (event) => {
 
     if (event.httpMethod === 'POST') {
       const inv = JSON.parse(event.body);
-      await sql`
-        INSERT INTO inventarios (
-          id, visita_id, sucursal_id, sucursal_nombre,
-          fecha, rubro, productos
-        ) VALUES (
-          ${inv.id}, ${inv.visitaId}, ${inv.sucursalId}, ${inv.sucursalNombre},
-          ${inv.fecha}, ${inv.rubro}, ${JSON.stringify(inv.productos)}
+await sql`
+  INSERT INTO inventarios (
+    id, visita_id, sucursal_id, sucursal_nombre,
+    fecha, rubro, semana_key, productos
+  ) VALUES (
+    ${inv.id}, ${inv.visitaId}, ${inv.sucursalId}, ${inv.sucursalNombre},
+    ${inv.fecha}, ${inv.rubro}, ${inv.semanaKey}, ${JSON.stringify(inv.productos)}
+  )
         )
       `;
       return { statusCode: 200, headers, body: JSON.stringify({ ok: true }) };
