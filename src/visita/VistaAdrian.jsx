@@ -8,7 +8,7 @@ import EncuestaVisita from "../encuesta/EncuestaVisita";
 import { descripcionSugerida, hallazgos as calcularHallazgos, resumenEncuesta } from "../encuesta/schema";
 import InventarioForm from "./InventarioForm";
 import PendientesPrevios from "./PendientesPrevios";
-import CierreVisita, { faltantesCierre } from "./CierreVisita";
+import CierreVisita, { faltantesCierre, dejoPendientes } from "./CierreVisita";
 import PendienteForm from "./PendienteForm";
 
 const CIERRE_VACIO = {
@@ -113,7 +113,7 @@ export default function VistaAdrian({ sucursales, equipo, visitas, setVisitas })
       hallazgo: cierre.hallazgo.trim(),
       accionTomada: cierre.accionTomada,
       accionDetalle: cierre.accionTomada ? cierre.accionDetalle.trim() : null,
-      dejoPendientes: pendientesNuevos.length > 0 ? true : cierre.dejoPendientes,
+      dejoPendientes: dejoPendientes(cierre, pendientesNuevos),
     };
   };
 

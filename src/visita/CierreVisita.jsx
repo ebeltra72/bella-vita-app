@@ -15,15 +15,25 @@ import { Badge, Btn, Card, Textarea } from "../ui";
 // eso se avisa pero se deja pasar.
 // ══════════════════════════════════════════════════════════════════════════════
 
+// ¿Quedó algún pendiente? Haber creado uno ES la respuesta, así que no se le
+// vuelve a preguntar. Esta derivación la usan la validación, el render y
+// armarVisita en VistaAdrian: vive acá sola para que no se puedan desalinear.
+export function dejoPendientes(cierre, pendientesNuevos = []) {
+  if (pendientesNuevos.length > 0) return true;
+  return cierre.dejoPendientes;
+}
+
 // Qué falta para poder finalizar. Se exporta para que VistaAdrian valide igual.
-export function faltantesCierre(cierre, pendientesNuevos) {
+export function faltantesCierre(cierre, pendientesNuevos = []) {
   const faltan = [];
+  const dejo = dejoPendientes(cierre, pendientesNuevos);
+
   if (!cierre.semaforo) faltan.push("Elegí el estado general de la sucursal");
   if (!cierre.hallazgo?.trim()) faltan.push("Escribí el principal hallazgo");
   if (cierre.accionTomada == null) faltan.push("Indicá si tomaste alguna acción");
   if (cierre.accionTomada === true && !cierre.accionDetalle?.trim()) faltan.push("Contá qué acción tomaste");
-  if (cierre.dejoPendientes == null) faltan.push("Indicá si quedó algún pendiente");
-  if (cierre.dejoPendientes === true && pendientesNuevos.length === 0) {
+  if (dejo == null) faltan.push("Indicá si quedó algún pendiente");
+  if (dejo === true && pendientesNuevos.length === 0) {
     faltan.push("Creá al menos un pendiente antes de finalizar");
   }
   return faltan;
@@ -63,7 +73,7 @@ export default function CierreVisita({
   const faltan = faltantesCierre(cierre, pendientesNuevos);
 
   // Si ya creó pendientes durante la visita, la respuesta es evidente
-  const pendientesForzados = pendientesNuevos.length > 0;
+  const pendientesForzados = dejoPendientes(cierre, pendientesNuevos) === true && pendientesNuevos.length > 0;
 
   return (
     <div>
@@ -218,7 +228,7 @@ export default function CierreVisita({
           );
         })}
 
-        {cierre.dejoPendientes === true && (
+        {dejoPendientes(cierre, pendientesNuevos) === true && (
           <button onClick={onCrearPendiente} style={{
             width:"100%", marginTop:10, padding:"11px", borderRadius:12,
             border:`1.5px dashed ${T.amber}`, background:T.amberBg, color:T.amber,
