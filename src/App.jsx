@@ -22,7 +22,8 @@ import MiembrosPanel from "./paneles/MiembrosPanel";
 export default function App() {
   const [vista, setVista] = useState("adrian");
   const [tabIleana, setTabIleana] = useState("historial");
-  const [preguntas,  setPreguntas]  = useLocalStorage("bv_preguntas",  PREGUNTAS_INIT);
+  // bv_preguntas ya no se edita: sólo se usa para renderizar las visitas v1
+  const [preguntas] = useLocalStorage("bv_preguntas", PREGUNTAS_INIT);
   const [sucursales, setSucursales] = useLocalStorage("bv_sucursales", SUCURSALES_INIT);
   const [equipo, setEquipo]         = useLocalStorage("bv_equipo",     EQUIPO_INIT);
   const [meta,       setMeta]       = useLocalStorage("bv_meta",       META_INIT);
@@ -92,7 +93,7 @@ export default function App() {
           {tabIleana==="historial"  && <HistorialPanel visitas={visitas} preguntas={preguntas}/>}
           {tabIleana==="pendientes" && <PendientesPanel sucursales={sucursales} equipo={equipo}/>}
           {tabIleana==="gestion"    && <GestionComercialPanel registros={registros} equipo={equipo} meta={meta} setMeta={setMeta}/>}
-          {tabIleana==="encuesta"   && <EncuestaPanel preguntas={preguntas} setPreguntas={setPreguntas}/>}
+          {tabIleana==="encuesta"   && <EncuestaPanel/>}
           {tabIleana==="sucursales" && <SucursalesPanel sucursales={sucursales} setSucursales={setSucursales}/>}
           {tabIleana==="km"         && <KmPanel visitas={visitas}/>}
           {tabIleana==="inventario"  && <InventarioPanel/>}
