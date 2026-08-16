@@ -43,6 +43,7 @@ export default function VistaAdrian({ sucursales, equipo, visitas, setVisitas })
 
   const [guardando, setGuardando] = useState(false);
   const [errorGuardado, setErrorGuardado] = useState(null);
+  const [avisoVinculo, setAvisoVinculo] = useState(null);
   const [porGuardar, setPorGuardar] = useState(null); // visita ya armada, para reintentar
 
   const [previewPendientes, setPreviewPendientes] = useState(null);
@@ -142,11 +143,22 @@ export default function VistaAdrian({ sucursales, equipo, visitas, setVisitas })
       // servidor hace el matching por sucursal + fecha; si no hay ninguna no
       // pasa nada, la visita simplemente no estaba en el plan. La fecha sale
       // del check-in y no de hoy(), por si la visita cruzó la medianoche.
-      await API.vincularVisita({
-        visitaId: fin.id,
-        sucursalId: fin.sucursalId,
-        fecha: fechaLocal(fin.checkin),
-      });
+      //
+      // Va en su propio try: si falla, la visita YA está guardada y no tiene
+      // sentido decirle a Adrián que se perdió todo. El vínculo con el plan es
+      // secundario y además es recuperable — el GET del plan detecta la visita
+      // huérfana y le ofrece a Ileana engancharla con un tap.
+      try {
+        await API.vincularVisita({
+          visitaId: fin.id,
+          sucursalId: fin.sucursalId,
+          fecha: fechaLocal(fin.checkin),
+        });
+        setAvisoVinculo(null);
+      } catch (e) {
+        console.error('No se pudo vincular la visita con su recorrida:', e, e.pg || '');
+        setAvisoVinculo(e.message || 'No se pudo vincular con el plan');
+      }
 
       setVisitas(p => [fin, ...p]);
       setVisitaActual(null);
@@ -166,6 +178,7 @@ export default function VistaAdrian({ sucursales, equipo, visitas, setVisitas })
     setFase("inicio"); setSucursalId(""); setSinPermiso(false);
     setPendientesPrevios([]); setPendientesNuevos([]); setResoluciones({});
     setCierre(CIERRE_VACIO); setErrorGuardado(null); setPorGuardar(null);
+    setAvisoVinculo(null);
   };
 
   // ─── PENDIENTES ────────────────────────────────────────────────────────────
@@ -285,11 +298,23 @@ export default function VistaAdrian({ sucursales, equipo, visitas, setVisitas })
         <div style={{ fontFamily:F.serif, fontSize:24, fontWeight:700, color:T.primaryDeep, marginBottom:8 }}>
           ¡Visita registrada!
         </div>
-        <div style={{ color:T.muted, fontSize:14, marginBottom:24, lineHeight:1.6 }}>
+        <div style={{ color:T.muted, fontSize:14, marginBottom: avisoVinculo ? 14 : 24, lineHeight:1.6 }}>
           La información quedó guardada correctamente.
           {pendientesNuevos.length > 0 && <><br/>Se crearon {pendientesNuevos.length} {pendientesNuevos.length === 1 ? "pendiente" : "pendientes"}.</>}
           {resueltos > 0 && <><br/>Se cerraron {resueltos} {resueltos === 1 ? "pendiente anterior" : "pendientes anteriores"}.</>}
         </div>
+        {avisoVinculo && (
+          <div style={{
+            background:T.amberBg, border:`1px solid ${T.amber}44`, borderRadius:12,
+            padding:"11px 13px", fontSize:12, color:T.text, textAlign:"left",
+            marginBottom:20, lineHeight:1.5,
+          }}>
+            <strong style={{ color:T.amber }}>La visita se guardó bien</strong>, pero no se
+            pudo marcar la recorrida del plan como realizada. Ileana puede
+            vincularla desde la pestaña Plan.
+            <div style={{ color:T.muted2, marginTop:5, fontSize:11 }}>{avisoVinculo}</div>
+          </div>
+        )}
         <Btn onClick={reset}>Nueva visita</Btn>
       </Card>
     </div>

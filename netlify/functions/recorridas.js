@@ -34,6 +34,18 @@ exports.handler = async (event) => {
 
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers, body: '' };
 
+  // DIAGNÓSTICO TEMPORAL — Fase 3
+  // Si esta línea NO aparece en los logs de Vercel, el problema no está en el
+  // código: la function no se está ejecutando (404, ruta mal resuelta o build
+  // que no la incluyó). Si aparece, el error es de adentro. Sacar cuando el bug
+  // de vincular_visita esté cerrado.
+  console.log('[recorridas] IN', JSON.stringify({
+    metodo: event.httpMethod,
+    query: event.queryStringParameters || null,
+    body: event.httpMethod === 'POST' ? String(event.body || '').slice(0, 300) : null,
+    tieneDbUrl: !!process.env.DATABASE_URL,
+  }));
+
   try {
     // ─── GET ?mes=YYYY-MM ────────────────────────────────────────────────────
     if (event.httpMethod === 'GET') {
@@ -150,6 +162,12 @@ exports.handler = async (event) => {
     // más temprana. La fecha la manda el cliente ya en hora local.
     if (accion === 'vincular_visita') {
       const { visitaId, sucursalId, fecha } = body;
+      // DIAGNÓSTICO TEMPORAL — tipos exactos de lo que llega desde el cliente
+      console.log('[recorridas] vincular_visita params', JSON.stringify({
+        visitaId, tipoVisitaId: typeof visitaId,
+        sucursalId, tipoSucursalId: typeof sucursalId,
+        fecha, tipoFecha: typeof fecha,
+      }));
       if (visitaId == null) return json(400, { error: 'Falta visitaId' });
       if (sucursalId == null) return json(400, { error: 'Falta sucursalId' });
       if (!fecha) return json(400, { error: 'Falta fecha' });
@@ -177,12 +195,42 @@ exports.handler = async (event) => {
         RETURNING *
       `;
       // Sin match no es un error: la visita simplemente no estaba planificada
+      console.log('[recorridas] vincular_visita OK', JSON.stringify({
+        vinculada: !!rows[0], recorridaId: rows[0]?.id || null,
+      }));
       return json(200, { ok: true, recorrida: rows[0] || null, yaEstaba: false });
     }
 
     return json(400, { error: `Acción desconocida: ${accion}` });
   } catch (e) {
-    console.log('recorridas error:', e.message);
-    return json(500, { error: e.message });
+    // DIAGNÓSTICO TEMPORAL — Fase 3
+    // Los errores de Postgres traen mucho más que .message: el código SQLSTATE,
+    // el detail, la constraint que se violó y la rutina interna que falló. Sin
+    // eso, un error de tipos y uno de FK se ven igual. Sacar cuando el bug de
+    // vincular_visita esté cerrado.
+    const pg = {
+      message:    e.message,
+      code:       e.code,          // SQLSTATE: 23503 = FK, 23505 = unique, 42804 = tipos
+      detail:     e.detail,
+      hint:       e.hint,
+      constraint: e.constraint,
+      table:      e.table,
+      column:     e.column,
+      dataType:   e.dataType,
+      routine:    e.routine,       // rutina interna de Postgres que lanzó el error
+      severity:   e.severity,
+      position:   e.position,
+      sourceError: e.sourceError?.message,
+    };
+    console.error('[recorridas] ERROR', JSON.stringify({
+      accion: (() => { try { return JSON.parse(event.body || '{}').accion; } catch { return null; } })(),
+      metodo: event.httpMethod,
+      query: event.queryStringParameters,
+      pg,
+    }));
+    console.error('[recorridas] STACK', e.stack);
+
+    // Se devuelven también al cliente: sin esto el front sólo ve un 500 pelado
+    return json(500, { error: e.message || 'Error sin mensaje', pg });
   }
 };

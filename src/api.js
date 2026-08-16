@@ -1,3 +1,34 @@
+// ─── POST con errores que no se tragan ──────────────────────────────────────
+// El patrón anterior era: `const data = await r.json().catch(()=>({}))` y después
+// `data.error || 'mensaje genérico'`. Si la respuesta no era el JSON de nuestra
+// function — un 404, un 502, un timeout, una página de error HTML — el cuerpo se
+// perdía y sólo quedaba el mensaje genérico, que es justo cuando más falta hace
+// saber qué pasó. Ahora siempre viaja el status y un pedazo del cuerpo crudo.
+async function post(url, body, contexto) {
+  let r;
+  try {
+    r = await fetch(url, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    });
+  } catch (e) {
+    throw new Error(`${contexto}: no se pudo contactar al servidor (${e.message})`);
+  }
+
+  const texto = await r.text().catch(() => '');
+  let data = {};
+  try { data = texto ? JSON.parse(texto) : {}; } catch { /* no era JSON */ }
+
+  if (!r.ok) {
+    const detalle = data.error || (texto ? texto.slice(0, 300).replace(/\s+/g, ' ') : 'respuesta vacía');
+    const err = new Error(`${contexto} [HTTP ${r.status}] ${detalle}`);
+    err.status = r.status;
+    err.pg = data.pg || null;   // detalle de Postgres, si la function lo mandó
+    if (data.pg) console.error(`${contexto} · error de Postgres:`, data.pg);
+    throw err;
+  }
+  return data;
+}
+
 // ─── API ─────────────────────────────────────────────────────────────────────
 export const API = {
   async getVisitas() {
@@ -18,10 +49,10 @@ export const API = {
       encuestaVersion: v.encuesta_version || 'v1',
     }));
   },
+  // Antes esto no chequeaba r.ok: un 500 al guardar la visita pasaba
+  // desapercibido y el reintento del check-out nunca se disparaba.
   async saveVisita(v) {
-    await fetch('/.netlify/functions/visitas', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(v),
-    });
+    return post('/.netlify/functions/visitas', v, 'No se pudo guardar la visita');
   },
   async uploadFoto({ data, visitaId, sucursal, tipo }) {
     const r = await fetch('/.netlify/functions/upload-foto', {
@@ -42,9 +73,7 @@ export const API = {
     }));
   },
   async saveRegistro(r) {
-    await fetch('/.netlify/functions/registros', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(r),
-    });
+    return post('/.netlify/functions/registros', r, 'No se pudieron guardar los números');
   },
   async getInventarios(sucursalId) {
     const url = sucursalId ? `/.netlify/functions/inventarios?sucursal_id=${sucursalId}` : '/.netlify/functions/inventarios';
@@ -53,9 +82,7 @@ export const API = {
     return r.json();
   },
   async saveInventario(inv) {
-    await fetch('/.netlify/functions/inventarios', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(inv),
-    });
+    return post('/.netlify/functions/inventarios', inv, 'No se pudo guardar el inventario');
   },
 
   // ─── PENDIENTES ────────────────────────────────────────────────────────────
@@ -145,14 +172,8 @@ function mapRecorrida(r) {
   };
 }
 
-async function postRecorridas(body) {
-  const r = await fetch('/.netlify/functions/recorridas', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
-  });
-  const data = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(data.error || 'Error al guardar el plan');
-  return data;
-}
+const postRecorridas = (body) =>
+  post('/.netlify/functions/recorridas', body, `No se pudo guardar el plan (${body.accion})`);
 
 // ─── HELPERS DE PENDIENTES ───────────────────────────────────────────────────
 function mapPendiente(p) {
@@ -178,11 +199,5 @@ function mapPendiente(p) {
   };
 }
 
-async function postPendientes(body) {
-  const r = await fetch('/.netlify/functions/pendientes', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
-  });
-  const data = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(data.error || 'Error al guardar el pendiente');
-  return data;
-}
+const postPendientes = (body) =>
+  post('/.netlify/functions/pendientes', body, 'No se pudo guardar el pendiente');
