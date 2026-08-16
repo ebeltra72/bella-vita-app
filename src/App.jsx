@@ -8,6 +8,7 @@ import VistaAdrian from "./visita/VistaAdrian";
 import VistaEquipo from "./VistaEquipo";
 
 import HistorialPanel from "./paneles/HistorialPanel";
+import PendientesPanel from "./paneles/PendientesPanel";
 import GestionComercialPanel from "./paneles/GestionComercialPanel";
 import EncuestaPanel from "./paneles/EncuestaPanel";
 import SucursalesPanel from "./paneles/SucursalesPanel";
@@ -37,7 +38,7 @@ export default function App() {
   }, []);
 
   const VISTAS = [["adrian","🗺 Adrián"],["equipo","💼 Equipo"],["ileana","👩‍💼 Ileana"]];
-  const TABS   = [["historial","📋 Visitas"],["gestion","💜 Comercial"],["inventario","📦 Stock"],["encuesta","📝 Encuesta"],["sucursales","📍 Sucursales"],["km","🚗 Km"],["miembros","👥 Equipo"]];
+  const TABS   = [["historial","📋 Visitas"],["pendientes","⚠ Pendientes"],["gestion","💜 Comercial"],["inventario","📦 Stock"],["encuesta","📝 Encuesta"],["sucursales","📍 Sucursales"],["km","🚗 Km"],["miembros","👥 Equipo"]];
 
   return (
     <div style={{ minHeight:"100vh", background:T.bgApp, fontFamily:F.body, color:T.text, WebkitFontSmoothing:"antialiased" }}>
@@ -89,6 +90,7 @@ export default function App() {
             ))}
           </div>
           {tabIleana==="historial"  && <HistorialPanel visitas={visitas} preguntas={preguntas}/>}
+          {tabIleana==="pendientes" && <PendientesPanel sucursales={sucursales} equipo={equipo}/>}
           {tabIleana==="gestion"    && <GestionComercialPanel registros={registros} equipo={equipo} meta={meta} setMeta={setMeta}/>}
           {tabIleana==="encuesta"   && <EncuestaPanel preguntas={preguntas} setPreguntas={setPreguntas}/>}
           {tabIleana==="sucursales" && <SucursalesPanel sucursales={sucursales} setSucursales={setSucursales}/>}

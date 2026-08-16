@@ -18,12 +18,18 @@ import { Btn, FotoUploader, Input, Label, Select, Textarea } from "../ui";
 export default function PendienteForm({
   inicial = {},
   equipo = [],
-  sucursal,
+  sucursal,       // sucursal fija (durante una visita)
+  sucursales,     // lista para elegir (desde el panel de Ileana)
   visitaId,
   titulo = "Nuevo pendiente",
   onGuardar,
   onCancelar,
 }) {
+  // Durante una visita la sucursal viene dada; en el panel hay que elegirla
+  const eligeSucursal = !sucursal && Array.isArray(sucursales);
+  const [sucursalId, setSucursalId] = useState("");
+  const elegida = sucursal || sucursales?.find(s => s.id === Number(sucursalId)) || null;
+
   const [form, setForm] = useState({
     categoria: inicial.categoria || "otro",
     descripcion: inicial.descripcion || "",
@@ -42,14 +48,16 @@ export default function PendienteForm({
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const descripcionOk = form.descripcion.trim().length > 0;
+  const sucursalOk = !!elegida;
+  const listo = descripcionOk && sucursalOk;
 
   const guardar = () => {
-    if (!descripcionOk) return;
+    if (!listo) return;
     onGuardar({
       id: Date.now(),
       visitaId: visitaId ?? null,
-      sucursalId: sucursal?.id ?? null,
-      sucursalNombre: sucursal?.nombre ?? "",
+      sucursalId: elegida.id,
+      sucursalNombre: elegida.nombre,
       categoria: form.categoria,
       descripcion: form.descripcion.trim(),
       accionCorrectiva: form.accionCorrectiva.trim() || null,
@@ -81,6 +89,16 @@ export default function PendienteForm({
             borderRadius:20, width:32, height:32, fontSize:15,
           }}>✕</button>
         </div>
+
+        {eligeSucursal && (
+          <div style={{ marginBottom:14 }}>
+            <Label>Sucursal *</Label>
+            <Select value={sucursalId} onChange={e => setSucursalId(e.target.value)}>
+              <option value="">— Elegí una sucursal —</option>
+              {sucursales.map(s => <option key={s.id} value={s.id}>{s.nombre}</option>)}
+            </Select>
+          </div>
+        )}
 
         <div style={{ marginBottom:14 }}>
           <Label>Categoría</Label>
@@ -167,15 +185,17 @@ export default function PendienteForm({
           <Label>Evidencia</Label>
           <FotoUploader
             visitaId={visitaId}
-            sucursal={sucursal?.nombre}
+            sucursal={elegida?.nombre}
             tipo="pendiente"
             value={form.evidenciaUrl}
             onChange={url => set("evidenciaUrl", url)}
           />
         </div>
 
-        <Btn disabled={!descripcionOk} onClick={guardar}>
-          {descripcionOk ? "Guardar pendiente" : "Escribí qué hay que resolver"}
+        <Btn disabled={!listo} onClick={guardar}>
+          {!sucursalOk ? "Elegí la sucursal"
+            : !descripcionOk ? "Escribí qué hay que resolver"
+            : "Guardar pendiente"}
         </Btn>
         <Btn variant="ghost" onClick={onCancelar} style={{ marginTop:8 }}>Cancelar</Btn>
       </div>
