@@ -62,6 +62,14 @@ export const Input = ({ type="text", value, onChange, placeholder, style: sx }) 
   }}/>
 );
 
+export const Textarea = ({ value, onChange, placeholder, rows=3, style: sx }) => (
+  <textarea value={value} onChange={onChange} placeholder={placeholder} rows={rows} style={{
+    width:"100%", padding:"11px 13px", borderRadius:12, border:`1.5px solid ${T.border}`,
+    background:T.inputBg, fontSize:14, color:T.text, outline:"none", fontFamily:F.body,
+    resize:"vertical", ...sx
+  }}/>
+);
+
 export const Select = ({ value, onChange, children }) => (
   <select value={value} onChange={onChange} style={{
     width:"100%", padding:"11px 13px", borderRadius:12, border:`1.5px solid ${T.border}`,

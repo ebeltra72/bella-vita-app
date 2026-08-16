@@ -65,3 +65,43 @@ export const RUBRO_ICONOS = {
   "Médico": "💉",
   "Limpiezas y masajes": "🧴",
 };
+
+// ─── PENDIENTES ──────────────────────────────────────────────────────────────
+// Los `id` son exactamente los valores que aceptan los CHECK de la tabla
+// pendientes (ver db/fase1.sql). `badge` es un color de <Badge>.
+
+export const PRIORIDADES = [
+  { id: "critica", label: "Crítica", badge: "error" },
+  { id: "alta",    label: "Alta",    badge: "amber" },
+  { id: "media",   label: "Media",   badge: "gold"  },
+  { id: "baja",    label: "Baja",    badge: "terr"  },
+];
+
+export const ESTADOS = [
+  { id: "abierto",     label: "Abierto",     badge: "error" },
+  { id: "en_progreso", label: "En progreso", badge: "amber" },
+  { id: "resuelto",    label: "Resuelto",    badge: "sage"  },
+  { id: "cancelado",   label: "Cancelado",   badge: "terr"  },
+];
+
+// Coinciden con las secciones de la encuesta, más 'otro' para los pendientes
+// que Ileana carga a mano desde el panel.
+export const CATEGORIAS = [
+  { id: "atencion",  label: "Atención al paciente",        icono: "🤝" },
+  { id: "equipo",    label: "Equipo de trabajo",           icono: "👥" },
+  { id: "operacion", label: "Operación e infraestructura", icono: "🏢" },
+  { id: "maquinas",  label: "Máquinas y equipamiento",     icono: "⚙️" },
+  { id: "comercial", label: "Comercial",                   icono: "📣" },
+  { id: "niza",      label: "Productos Niza",              icono: "🧴" },
+  { id: "otro",      label: "Otro",                        icono: "📌" },
+];
+
+export const SEMAFORO = [
+  { id: "sin_problemas", label: "Sin problemas",                    icono: "🟢", badge: "sage"  },
+  { id: "mejorable",     label: "Hay aspectos a mejorar",           icono: "🟡", badge: "amber" },
+  { id: "prioritario",   label: "Requiere intervención prioritaria", icono: "🔴", badge: "error" },
+];
+
+// Busca en cualquiera de las listas de arriba
+export const opcion = (lista, id) => lista.find(x => x.id === id) || null;
+export const etiqueta = (lista, id) => opcion(lista, id)?.label || id || "—";
