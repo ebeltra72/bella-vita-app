@@ -73,7 +73,7 @@ export default function App() {
         </div>
       )}
 
-      {!cargando && vista==="adrian" && <VistaAdrian sucursales={sucursales} preguntas={preguntas} visitas={visitas} setVisitas={setVisitas}/>}
+      {!cargando && vista==="adrian" && <VistaAdrian sucursales={sucursales} equipo={equipo} visitas={visitas} setVisitas={setVisitas}/>}
       {!cargando && vista==="equipo" && <VistaEquipo equipo={equipo} registros={registros} setRegistros={setRegistros} meta={meta}/>}
       {!cargando && vista==="ileana" && (
         <>

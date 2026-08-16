@@ -15,6 +15,32 @@ export function duracion(a,b){ if(!a||!b)return null; const m=Math.round((new Da
 export function hoy(){ return new Date().toISOString().slice(0,10); }
 export function mesActual(){ return new Date().toISOString().slice(0,7); }
 
+// ─── PENDIENTES: vencimientos ────────────────────────────────────────────────
+// Días desde hoy hasta la fecha límite. Negativo = vencido, null = sin fecha.
+export function diasRestantes(fechaLimite) {
+  if (!fechaLimite) return null;
+  const limite = new Date(`${String(fechaLimite).slice(0, 10)}T00:00:00`);
+  if (isNaN(limite)) return null;
+  const hoyD = new Date();
+  hoyD.setHours(0, 0, 0, 0);
+  return Math.round((limite - hoyD) / 86400000);
+}
+
+export function estaVencido(pendiente) {
+  if (!pendiente || ["resuelto", "cancelado"].includes(pendiente.estado)) return false;
+  const d = diasRestantes(pendiente.fechaLimite);
+  return d !== null && d < 0;
+}
+
+// "Vence hoy" / "Vencido hace 3 días" / "Faltan 5 días"
+export function textoVencimiento(fechaLimite) {
+  const d = diasRestantes(fechaLimite);
+  if (d === null) return null;
+  if (d === 0) return "Vence hoy";
+  if (d < 0) return `Vencido hace ${Math.abs(d)} ${Math.abs(d) === 1 ? "día" : "días"}`;
+  return `Faltan ${d} ${d === 1 ? "día" : "días"}`;
+}
+
 export function useLocalStorage(key, init) {
   const [val, setVal] = useState(() => { try { return JSON.parse(localStorage.getItem(key))??init; } catch { return init; } });
   const set = (v) => { const next=typeof v==="function"?v(val):v; setVal(next); localStorage.setItem(key,JSON.stringify(next)); };
