@@ -84,6 +84,9 @@ export const ESTADOS = [
   { id: "cancelado",   label: "Cancelado",   badge: "terr"  },
 ];
 
+// Un pendiente cerrado ya no cuenta como abierto ni puede estar vencido
+export const ESTADOS_CERRADOS = ["resuelto", "cancelado"];
+
 // Coinciden con las secciones de la encuesta, más 'otro' para los pendientes
 // que Ileana carga a mano desde el panel.
 export const CATEGORIAS = [

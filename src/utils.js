@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { ESTADOS_CERRADOS } from "./constants";
 
 // ─── HELPERS ────────────────────────────────────────────────────────────────
 export function distanciaM(lat1, lng1, lat2, lng2) {
@@ -33,7 +34,7 @@ export function diasRestantes(fechaLimite) {
 }
 
 export function estaVencido(pendiente) {
-  if (!pendiente || ["resuelto", "cancelado"].includes(pendiente.estado)) return false;
+  if (!pendiente || ESTADOS_CERRADOS.includes(pendiente.estado)) return false;
   const d = diasRestantes(pendiente.fechaLimite);
   return d !== null && d < 0;
 }

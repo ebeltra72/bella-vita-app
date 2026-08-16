@@ -1,12 +1,11 @@
 import { useState, useEffect } from "react";
 import { T, F } from "../theme";
-import { CATEGORIAS, ESTADOS, PRIORIDADES, opcion } from "../constants";
+import { CATEGORIAS, ESTADOS, ESTADOS_CERRADOS as CERRADOS, PRIORIDADES, opcion } from "../constants";
 import { API } from "../api";
 import { estaVencido, fmtFecha, textoVencimiento } from "../utils";
 import { Badge, Btn, BtnSm, Card, Label, Textarea } from "../ui";
 import PendienteForm from "../visita/PendienteForm";
 
-const CERRADOS = ["resuelto", "cancelado"];
 const RANK_PRIORIDAD = { critica: 0, alta: 1, media: 2, baja: 3 };
 
 // Mismo criterio que el ORDER BY de netlify/functions/pendientes.js: se replica

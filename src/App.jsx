@@ -7,6 +7,7 @@ import { useLocalStorage } from "./utils";
 import VistaAdrian from "./visita/VistaAdrian";
 import VistaEquipo from "./VistaEquipo";
 
+import DashboardPanel from "./dashboard/DashboardPanel";
 import HistorialPanel from "./paneles/HistorialPanel";
 import PendientesPanel from "./paneles/PendientesPanel";
 import GestionComercialPanel from "./paneles/GestionComercialPanel";
@@ -21,7 +22,10 @@ import MiembrosPanel from "./paneles/MiembrosPanel";
 // ══════════════════════════════════════════════════════════════════════════════
 export default function App() {
   const [vista, setVista] = useState("adrian");
-  const [tabIleana, setTabIleana] = useState("historial");
+  const [tabIleana, setTabIleana] = useState("dashboard");
+  // Foco que el Dashboard le pasa a Visitas al tocar una sucursal.
+  // El contador `n` permite reaplicarlo aunque se toque la misma dos veces.
+  const [foco, setFoco] = useState(null);
   // bv_preguntas ya no se edita: sólo se usa para renderizar las visitas v1
   const [preguntas] = useLocalStorage("bv_preguntas", PREGUNTAS_INIT);
   const [sucursales, setSucursales] = useLocalStorage("bv_sucursales", SUCURSALES_INIT);
@@ -39,7 +43,12 @@ export default function App() {
   }, []);
 
   const VISTAS = [["adrian","🗺 Adrián"],["equipo","💼 Equipo"],["ileana","👩‍💼 Ileana"]];
-  const TABS   = [["historial","📋 Visitas"],["pendientes","⚠ Pendientes"],["gestion","💜 Comercial"],["inventario","📦 Stock"],["encuesta","📝 Encuesta"],["sucursales","📍 Sucursales"],["km","🚗 Km"],["miembros","👥 Equipo"]];
+  const verSucursal = (nombre) => {
+    setFoco(f => ({ sucursal: nombre, n: (f?.n ?? 0) + 1 }));
+    setTabIleana("historial");
+  };
+
+  const TABS   = [["dashboard","📊 Dashboard"],["historial","📋 Visitas"],["pendientes","⚠ Pendientes"],["gestion","💜 Comercial"],["inventario","📦 Stock"],["encuesta","📝 Encuesta"],["sucursales","📍 Sucursales"],["km","🚗 Km"],["miembros","👥 Equipo"]];
 
   return (
     <div style={{ minHeight:"100vh", background:T.bgApp, fontFamily:F.body, color:T.text, WebkitFontSmoothing:"antialiased" }}>
@@ -90,7 +99,8 @@ export default function App() {
               }}>{l}</button>
             ))}
           </div>
-          {tabIleana==="historial"  && <HistorialPanel visitas={visitas} preguntas={preguntas}/>}
+          {tabIleana==="dashboard"  && <DashboardPanel sucursales={sucursales} visitas={visitas} onVerSucursal={verSucursal}/>}
+          {tabIleana==="historial"  && <HistorialPanel visitas={visitas} preguntas={preguntas} foco={foco}/>}
           {tabIleana==="pendientes" && <PendientesPanel sucursales={sucursales} equipo={equipo}/>}
           {tabIleana==="gestion"    && <GestionComercialPanel registros={registros} equipo={equipo} meta={meta} setMeta={setMeta}/>}
           {tabIleana==="encuesta"   && <EncuestaPanel/>}

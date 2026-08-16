@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { T, F } from "../theme";
 import { SEMAFORO, opcion } from "../constants";
 import { distanciaKm, duracion, fmtFecha, fmtHora } from "../utils";
@@ -129,10 +129,28 @@ function DetalleV2({ visita }) {
 // ══════════════════════════════════════════════════════════════════════════════
 // PANEL ILEANA – HISTORIAL
 // ══════════════════════════════════════════════════════════════════════════════
-export default function HistorialPanel({ visitas, preguntas }) {
+// `foco` llega desde el Dashboard: { sucursal, n }. El contador n existe para
+// que tocar dos veces la misma sucursal vuelva a aplicar el filtro aunque el
+// nombre no haya cambiado — si Ileana lo editó a mano en el medio, se reaplica.
+export default function HistorialPanel({ visitas, preguntas, foco }) {
   const [expandida, setExpandida] = useState(null);
   const [filtroSuc, setFiltroSuc] = useState("");
   const [filtroFecha, setFiltroFecha] = useState("");
+
+  useEffect(() => {
+    if (!foco?.sucursal) return;
+    setFiltroSuc(foco.sucursal);
+    setFiltroFecha("");
+    // Y se abre la última visita de esa sucursal, que es lo que se va a buscar
+    let ultima = null, ultimaFecha = null;
+    for (const v of visitas) {
+      if (v.sucursalNombre !== foco.sucursal || !v.checkin) continue;
+      const f = new Date(v.checkin);
+      if (isNaN(f)) continue;
+      if (!ultimaFecha || f > ultimaFecha) { ultima = v; ultimaFecha = f; }
+    }
+    setExpandida(ultima?.id ?? null);
+  }, [foco?.n]);
   const sucursalesUnicas = [...new Set(visitas.map(v => v.sucursalNombre))];
 
   let kmTotal = 0;
