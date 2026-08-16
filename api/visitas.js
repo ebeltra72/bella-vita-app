@@ -1,37 +1,29 @@
-const { neon } = require('@neondatabase/serverless');
+import { neon } from '@neondatabase/serverless';
+import { cors, leerBody, nul } from './_lib/http.js';
 
 const SEMAFOROS = ['sin_problemas', 'mejorable', 'prioritario'];
 
-const nul = (v) => (v === '' || v === undefined ? null : v);
+export default async function handler(req, res) {
+  cors(res);
+  if (req.method === 'OPTIONS') return res.status(200).end();
 
-exports.handler = async (event) => {
   const sql = neon(process.env.DATABASE_URL);
-  const headers = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Content-Type': 'application/json',
-  };
-
-  if (event.httpMethod === 'OPTIONS') {
-    return { statusCode: 200, headers, body: '' };
-  }
 
   try {
-    if (event.httpMethod === 'GET') {
+    if (req.method === 'GET') {
       const rows = await sql`SELECT * FROM visitas ORDER BY checkin DESC`;
-      return { statusCode: 200, headers, body: JSON.stringify(rows) };
+      return res.status(200).json(rows);
     }
 
-    if (event.httpMethod === 'POST') {
-      const v = JSON.parse(event.body);
+    if (req.method === 'POST') {
+      const v = leerBody(req);
 
       if (v.semaforo && !SEMAFOROS.includes(v.semaforo)) {
-        return { statusCode: 400, headers, body: JSON.stringify({ error: `Semáforo inválido: ${v.semaforo}` }) };
+        return res.status(400).json({ error: `Semáforo inválido: ${v.semaforo}` });
       }
 
       // encuesta_version la manda el cliente: 'v2' sólo cuando la visita se hizo
-      // con la encuesta estructurada. Sin ese campo se asume 'v1', que es lo que
-      // corresponde mientras VistaAdrian siga usando las preguntas viejas.
+      // con la encuesta estructurada. Sin ese campo se asume 'v1'.
       const version = v.encuestaVersion || 'v1';
 
       // Columnas explícitas y no INSERT ... VALUES posicional: agregar una columna
@@ -70,12 +62,12 @@ exports.handler = async (event) => {
           dejo_pendientes  = ${nul(v.dejoPendientes)},
           encuesta_version = ${version}
       `;
-      return { statusCode: 200, headers, body: JSON.stringify({ ok: true }) };
+      return res.status(200).json({ ok: true });
     }
 
-    return { statusCode: 405, headers, body: JSON.stringify({ error: 'Método no permitido' }) };
+    return res.status(405).json({ error: 'Método no permitido' });
   } catch (e) {
-    console.log('visitas error:', e.message);
-    return { statusCode: 500, headers, body: JSON.stringify({ error: e.message }) };
+    console.error('[visitas] ERROR', e.message, e.code || '', e.detail || '');
+    return res.status(500).json({ error: e.message });
   }
-};
+}

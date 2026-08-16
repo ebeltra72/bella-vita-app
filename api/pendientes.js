@@ -1,12 +1,10 @@
-const { neon } = require('@neondatabase/serverless');
+import { neon } from '@neondatabase/serverless';
+import { cors, leerBody, nul } from './_lib/http.js';
 
 const PRIORIDADES = ['critica', 'alta', 'media', 'baja'];
 const ESTADOS     = ['abierto', 'en_progreso', 'resuelto', 'cancelado'];
 const CATEGORIAS  = ['atencion', 'equipo', 'operacion', 'maquinas', 'comercial', 'niza', 'otro'];
 const CERRADOS    = ['resuelto', 'cancelado'];
-
-// '' y undefined se normalizan a null: un string vacío rompe el cast a DATE
-const nul = (v) => (v === '' || v === undefined ? null : v);
 
 function validar(p) {
   if (!p || typeof p !== 'object') return 'Body vacío o inválido';
@@ -36,20 +34,16 @@ async function insertar(sql, p) {
   `;
 }
 
-exports.handler = async (event) => {
-  const sql = neon(process.env.DATABASE_URL);
-  const headers = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Content-Type': 'application/json',
-  };
+export default async function handler(req, res) {
+  cors(res);
+  if (req.method === 'OPTIONS') return res.status(200).end();
 
-  if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers, body: '' };
+  const sql = neon(process.env.DATABASE_URL);
 
   try {
     // ─── GET con filtros ────────────────────────────────────────────────────
-    if (event.httpMethod === 'GET') {
-      const q = event.queryStringParameters || {};
+    if (req.method === 'GET') {
+      const q = req.query || {};
 
       // estado=activos es un atajo para abierto + en_progreso: es lo que necesita
       // la pantalla de pendientes previos al inicio de cada visita
@@ -77,45 +71,45 @@ exports.handler = async (event) => {
           fecha_creacion DESC
         LIMIT 500
       `;
-      return { statusCode: 200, headers, body: JSON.stringify(rows) };
+      return res.status(200).json(rows);
     }
 
     // ─── POST: crear / crear_lote / actualizar / seguimiento ────────────────
-    if (event.httpMethod === 'POST') {
-      const body = JSON.parse(event.body || '{}');
+    if (req.method === 'POST') {
+      const body = leerBody(req);
       const { accion } = body;
 
       if (accion === 'crear') {
         const err = validar(body.pendiente);
-        if (err) return { statusCode: 400, headers, body: JSON.stringify({ error: err }) };
+        if (err) return res.status(400).json({ error: err });
         await insertar(sql, body.pendiente);
-        return { statusCode: 200, headers, body: JSON.stringify({ ok: true, id: body.pendiente.id }) };
+        return res.status(200).json({ ok: true, id: body.pendiente.id });
       }
 
       // Alta en lote: el cierre de una visita puede dejar varios pendientes juntos
       if (accion === 'crear_lote') {
         const lista = Array.isArray(body.pendientes) ? body.pendientes : [];
         if (lista.length === 0) {
-          return { statusCode: 400, headers, body: JSON.stringify({ error: 'Lista de pendientes vacía' }) };
+          return res.status(400).json({ error: 'Lista de pendientes vacía' });
         }
         for (const p of lista) {
           const err = validar(p);
-          if (err) return { statusCode: 400, headers, body: JSON.stringify({ error: err }) };
+          if (err) return res.status(400).json({ error: err });
         }
         for (const p of lista) await insertar(sql, p);
-        return { statusCode: 200, headers, body: JSON.stringify({ ok: true, creados: lista.length }) };
+        return res.status(200).json({ ok: true, creados: lista.length });
       }
 
       if (accion === 'actualizar') {
         const p = body.pendiente || {};
         if (p.id == null) {
-          return { statusCode: 400, headers, body: JSON.stringify({ error: 'Falta id' }) };
+          return res.status(400).json({ error: 'Falta id' });
         }
         if (p.estado && !ESTADOS.includes(p.estado)) {
-          return { statusCode: 400, headers, body: JSON.stringify({ error: `Estado inválido: ${p.estado}` }) };
+          return res.status(400).json({ error: `Estado inválido: ${p.estado}` });
         }
         if (p.prioridad && !PRIORIDADES.includes(p.prioridad)) {
-          return { statusCode: 400, headers, body: JSON.stringify({ error: `Prioridad inválida: ${p.prioridad}` }) };
+          return res.status(400).json({ error: `Prioridad inválida: ${p.prioridad}` });
         }
 
         // COALESCE: sólo pisa los campos que vienen en el body, el resto queda igual
@@ -139,18 +133,18 @@ exports.handler = async (event) => {
           RETURNING *
         `;
         if (rows.length === 0) {
-          return { statusCode: 404, headers, body: JSON.stringify({ error: 'Pendiente no encontrado' }) };
+          return res.status(404).json({ error: 'Pendiente no encontrado' });
         }
-        return { statusCode: 200, headers, body: JSON.stringify({ ok: true, pendiente: rows[0] }) };
+        return res.status(200).json({ ok: true, pendiente: rows[0] });
       }
 
       if (accion === 'seguimiento') {
         const { id, texto, autor } = body;
         if (id == null) {
-          return { statusCode: 400, headers, body: JSON.stringify({ error: 'Falta id' }) };
+          return res.status(400).json({ error: 'Falta id' });
         }
         if (!texto || !String(texto).trim()) {
-          return { statusCode: 400, headers, body: JSON.stringify({ error: 'El seguimiento no puede estar vacío' }) };
+          return res.status(400).json({ error: 'El seguimiento no puede estar vacío' });
         }
         const entrada = [{
           fecha: new Date().toISOString(),
@@ -165,17 +159,17 @@ exports.handler = async (event) => {
           RETURNING *
         `;
         if (rows.length === 0) {
-          return { statusCode: 404, headers, body: JSON.stringify({ error: 'Pendiente no encontrado' }) };
+          return res.status(404).json({ error: 'Pendiente no encontrado' });
         }
-        return { statusCode: 200, headers, body: JSON.stringify({ ok: true, pendiente: rows[0] }) };
+        return res.status(200).json({ ok: true, pendiente: rows[0] });
       }
 
-      return { statusCode: 400, headers, body: JSON.stringify({ error: `Acción desconocida: ${accion}` }) };
+      return res.status(400).json({ error: `Acción desconocida: ${accion}` });
     }
 
-    return { statusCode: 405, headers, body: JSON.stringify({ error: 'Método no permitido' }) };
+    return res.status(405).json({ error: 'Método no permitido' });
   } catch (e) {
-    console.log('pendientes error:', e.message);
-    return { statusCode: 500, headers, body: JSON.stringify({ error: e.message }) };
+    console.error('[pendientes] ERROR', e.message, e.code || '', e.detail || '');
+    return res.status(500).json({ error: e.message });
   }
-};
+}

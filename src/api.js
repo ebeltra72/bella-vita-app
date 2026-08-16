@@ -32,7 +32,7 @@ async function post(url, body, contexto) {
 // ─── API ─────────────────────────────────────────────────────────────────────
 export const API = {
   async getVisitas() {
-    const r = await fetch('/.netlify/functions/visitas');
+    const r = await fetch('/api/visitas');
     if (!r.ok) throw new Error('Error al cargar visitas');
     const rows = await r.json();
     return rows.map(v => ({
@@ -52,18 +52,15 @@ export const API = {
   // Antes esto no chequeaba r.ok: un 500 al guardar la visita pasaba
   // desapercibido y el reintento del check-out nunca se disparaba.
   async saveVisita(v) {
-    return post('/.netlify/functions/visitas', v, 'No se pudo guardar la visita');
+    return post('/api/visitas', v, 'No se pudo guardar la visita');
   },
+  // Pasa por post() para que un 413 —foto por encima del límite de 4,5 MB de
+  // Vercel— se vea como tal y no como un "Error al subir foto" genérico.
   async uploadFoto({ data, visitaId, sucursal, tipo }) {
-    const r = await fetch('/.netlify/functions/upload-foto', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ data, visitaId, sucursal, tipo }),
-    });
-    if (!r.ok) throw new Error('Error al subir foto');
-    return r.json();
+    return post('/api/upload-foto', { data, visitaId, sucursal, tipo }, 'No se pudo subir la foto');
   },
   async getRegistros() {
-    const r = await fetch('/.netlify/functions/registros');
+    const r = await fetch('/api/registros');
     if (!r.ok) throw new Error('Error al cargar registros');
     const rows = await r.json();
     return rows.map(r => ({
@@ -73,16 +70,16 @@ export const API = {
     }));
   },
   async saveRegistro(r) {
-    return post('/.netlify/functions/registros', r, 'No se pudieron guardar los números');
+    return post('/api/registros', r, 'No se pudieron guardar los números');
   },
   async getInventarios(sucursalId) {
-    const url = sucursalId ? `/.netlify/functions/inventarios?sucursal_id=${sucursalId}` : '/.netlify/functions/inventarios';
+    const url = sucursalId ? `/api/inventarios?sucursal_id=${sucursalId}` : '/api/inventarios';
     const r = await fetch(url);
     if (!r.ok) throw new Error('Error al cargar inventarios');
     return r.json();
   },
   async saveInventario(inv) {
-    return post('/.netlify/functions/inventarios', inv, 'No se pudo guardar el inventario');
+    return post('/api/inventarios', inv, 'No se pudo guardar el inventario');
   },
 
   // ─── PENDIENTES ────────────────────────────────────────────────────────────
@@ -95,7 +92,7 @@ export const API = {
     if (filtros.estado)             qs.set('estado', filtros.estado);
     if (filtros.categoria)          qs.set('categoria', filtros.categoria);
     if (filtros.prioridad)          qs.set('prioridad', filtros.prioridad);
-    const url = '/.netlify/functions/pendientes' + (qs.toString() ? `?${qs}` : '');
+    const url = '/api/pendientes' + (qs.toString() ? `?${qs}` : '');
     const r = await fetch(url);
     if (!r.ok) throw new Error('Error al cargar pendientes');
     return (await r.json()).map(mapPendiente);
@@ -122,7 +119,7 @@ export const API = {
 
   // ─── RECORRIDAS ────────────────────────────────────────────────────────────
   async getRecorridas(mes) {
-    const r = await fetch(`/.netlify/functions/recorridas?mes=${encodeURIComponent(mes)}`);
+    const r = await fetch(`/api/recorridas?mes=${encodeURIComponent(mes)}`);
     if (!r.ok) throw new Error('Error al cargar el plan de recorridas');
     return (await r.json()).map(mapRecorrida);
   },
@@ -173,7 +170,7 @@ function mapRecorrida(r) {
 }
 
 const postRecorridas = (body) =>
-  post('/.netlify/functions/recorridas', body, `No se pudo guardar el plan (${body.accion})`);
+  post('/api/recorridas', body, `No se pudo guardar el plan (${body.accion})`);
 
 // ─── HELPERS DE PENDIENTES ───────────────────────────────────────────────────
 function mapPendiente(p) {
@@ -200,4 +197,4 @@ function mapPendiente(p) {
 }
 
 const postPendientes = (body) =>
-  post('/.netlify/functions/pendientes', body, 'No se pudo guardar el pendiente');
+  post('/api/pendientes', body, 'No se pudo guardar el pendiente');

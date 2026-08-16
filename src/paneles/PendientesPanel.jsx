@@ -8,7 +8,7 @@ import PendienteForm from "../visita/PendienteForm";
 
 const RANK_PRIORIDAD = { critica: 0, alta: 1, media: 2, baja: 3 };
 
-// Mismo criterio que el ORDER BY de netlify/functions/pendientes.js: se replica
+// Mismo criterio que el ORDER BY de api/pendientes.js: se replica
 // acá porque después de cada cambio de estado hay que reordenar en el cliente.
 function ordenar(lista) {
   return [...lista].sort((a, b) => {

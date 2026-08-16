@@ -1,4 +1,5 @@
-const { neon } = require('@neondatabase/serverless');
+import { neon } from '@neondatabase/serverless';
+import { cors, leerBody, nul } from './_lib/http.js';
 
 const FRANJAS  = ['apertura', 'intermedio', 'cierre'];
 const ESTADOS  = ['planificada', 'realizada', 'reprogramada', 'cancelada'];
@@ -6,7 +7,6 @@ const ESTADOS  = ['planificada', 'realizada', 'reprogramada', 'cancelada'];
 const ABIERTAS = ['planificada', 'reprogramada'];
 const TZ = 'America/Argentina/Buenos_Aires';
 
-const nul = (v) => (v === '' || v === undefined ? null : v);
 const esMes = (m) => typeof m === 'string' && /^\d{4}-\d{2}$/.test(m);
 
 // Orden de franja para desempatar: apertura → intermedio → cierre
@@ -23,16 +23,11 @@ function validar(r) {
   return null;
 }
 
-exports.handler = async (event) => {
-  const sql = neon(process.env.DATABASE_URL);
-  const headers = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Content-Type': 'application/json',
-  };
-  const json = (statusCode, body) => ({ statusCode, headers, body: JSON.stringify(body) });
+export default async function handler(req, res) {
+  cors(res);
+  if (req.method === 'OPTIONS') return res.status(200).end();
 
-  if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers, body: '' };
+  const sql = neon(process.env.DATABASE_URL);
 
   // DIAGNÓSTICO TEMPORAL — Fase 3
   // Si esta línea NO aparece en los logs de Vercel, el problema no está en el
@@ -40,17 +35,17 @@ exports.handler = async (event) => {
   // que no la incluyó). Si aparece, el error es de adentro. Sacar cuando el bug
   // de vincular_visita esté cerrado.
   console.log('[recorridas] IN', JSON.stringify({
-    metodo: event.httpMethod,
-    query: event.queryStringParameters || null,
-    body: event.httpMethod === 'POST' ? String(event.body || '').slice(0, 300) : null,
+    metodo: req.method,
+    query: req.query || null,
+    body: req.method === 'POST' ? JSON.stringify(leerBody(req)).slice(0, 300) : null,
     tieneDbUrl: !!process.env.DATABASE_URL,
   }));
 
   try {
     // ─── GET ?mes=YYYY-MM ────────────────────────────────────────────────────
-    if (event.httpMethod === 'GET') {
-      const mes = event.queryStringParameters?.mes;
-      if (!esMes(mes)) return json(400, { error: 'Falta el parámetro mes en formato YYYY-MM' });
+    if (req.method === 'GET') {
+      const mes = req.query?.mes;
+      if (!esMes(mes)) return res.status(400).json({ error: 'Falta el parámetro mes en formato YYYY-MM' });
 
       // visita_probable es la red de seguridad: si vincular_visita falló después
       // de que la visita se guardó, la recorrida quedaría en planificada para
@@ -77,22 +72,22 @@ exports.handler = async (event) => {
           CASE r.franja WHEN 'apertura' THEN 0 WHEN 'intermedio' THEN 1 ELSE 2 END,
           r.id
       `;
-      return json(200, rows);
+      return res.status(200).json(rows);
     }
 
-    if (event.httpMethod !== 'POST') return json(405, { error: 'Método no permitido' });
+    if (req.method !== 'POST') return res.status(405).json({ error: 'Método no permitido' });
 
-    const body = JSON.parse(event.body || '{}');
+    const body = leerBody(req);
     const { accion } = body;
 
     // ─── crear_plan ──────────────────────────────────────────────────────────
     if (accion === 'crear_plan') {
       const lista = Array.isArray(body.recorridas) ? body.recorridas : [];
-      if (lista.length === 0) return json(400, { error: 'No hay recorridas para crear' });
+      if (lista.length === 0) return res.status(400).json({ error: 'No hay recorridas para crear' });
 
       for (const r of lista) {
         const err = validar(r);
-        if (err) return json(400, { error: err });
+        if (err) return res.status(400).json({ error: err });
       }
 
       // ON CONFLICT DO NOTHING sin target cubre tanto la PK como el índice único
@@ -111,7 +106,7 @@ exports.handler = async (event) => {
         `;
         creadas += res.length;
       }
-      return json(200, { ok: true, creadas, omitidas: lista.length - creadas });
+      return res.status(200).json({ ok: true, creadas, omitidas: lista.length - creadas });
     }
 
     // ─── aprobar ─────────────────────────────────────────────────────────────
@@ -119,14 +114,14 @@ exports.handler = async (event) => {
     // nacen en false, así el panel puede avisar "N sin aprobar".
     if (accion === 'aprobar') {
       const { mes } = body;
-      if (!esMes(mes)) return json(400, { error: 'Mes inválido' });
+      if (!esMes(mes)) return res.status(400).json({ error: 'Mes inválido' });
       const rows = await sql`
         UPDATE recorridas_plan
         SET aprobado_por_ileana = true, aprobado_en = NOW(), actualizado_en = NOW()
         WHERE mes = ${mes} AND aprobado_por_ileana = false
         RETURNING id
       `;
-      return json(200, { ok: true, aprobadas: rows.length });
+      return res.status(200).json({ ok: true, aprobadas: rows.length });
     }
 
     // ─── actualizar_estado ───────────────────────────────────────────────────
@@ -135,8 +130,8 @@ exports.handler = async (event) => {
     // había prometido originalmente).
     if (accion === 'actualizar_estado') {
       const { id, estado, fechaPlan, motivoReprogramacion } = body;
-      if (id == null) return json(400, { error: 'Falta id' });
-      if (estado && !ESTADOS.includes(estado)) return json(400, { error: `Estado inválido: ${estado}` });
+      if (id == null) return res.status(400).json({ error: 'Falta id' });
+      if (estado && !ESTADOS.includes(estado)) return res.status(400).json({ error: `Estado inválido: ${estado}` });
 
       const rows = await sql`
         UPDATE recorridas_plan SET
@@ -152,8 +147,8 @@ exports.handler = async (event) => {
         WHERE id = ${id}
         RETURNING *
       `;
-      if (rows.length === 0) return json(404, { error: 'Recorrida no encontrada' });
-      return json(200, { ok: true, recorrida: rows[0] });
+      if (rows.length === 0) return res.status(404).json({ error: 'Recorrida no encontrada' });
+      return res.status(200).json({ ok: true, recorrida: rows[0] });
     }
 
     // ─── vincular_visita ─────────────────────────────────────────────────────
@@ -168,9 +163,9 @@ exports.handler = async (event) => {
         sucursalId, tipoSucursalId: typeof sucursalId,
         fecha, tipoFecha: typeof fecha,
       }));
-      if (visitaId == null) return json(400, { error: 'Falta visitaId' });
-      if (sucursalId == null) return json(400, { error: 'Falta sucursalId' });
-      if (!fecha) return json(400, { error: 'Falta fecha' });
+      if (visitaId == null) return res.status(400).json({ error: 'Falta visitaId' });
+      if (sucursalId == null) return res.status(400).json({ error: 'Falta sucursalId' });
+      if (!fecha) return res.status(400).json({ error: 'Falta fecha' });
 
       // Idempotencia: si esta visita ya está vinculada, no engancharla a otra.
       // Sin esto, un reintento del check-out marcaría dos recorridas como
@@ -178,7 +173,7 @@ exports.handler = async (event) => {
       const ya = await sql`
         SELECT * FROM recorridas_plan WHERE visita_id = ${visitaId} LIMIT 1
       `;
-      if (ya.length > 0) return json(200, { ok: true, recorrida: ya[0], yaEstaba: true });
+      if (ya.length > 0) return res.status(200).json({ ok: true, recorrida: ya[0], yaEstaba: true });
 
       const rows = await sql`
         UPDATE recorridas_plan
@@ -198,10 +193,10 @@ exports.handler = async (event) => {
       console.log('[recorridas] vincular_visita OK', JSON.stringify({
         vinculada: !!rows[0], recorridaId: rows[0]?.id || null,
       }));
-      return json(200, { ok: true, recorrida: rows[0] || null, yaEstaba: false });
+      return res.status(200).json({ ok: true, recorrida: rows[0] || null, yaEstaba: false });
     }
 
-    return json(400, { error: `Acción desconocida: ${accion}` });
+    return res.status(400).json({ error: `Acción desconocida: ${accion}` });
   } catch (e) {
     // DIAGNÓSTICO TEMPORAL — Fase 3
     // Los errores de Postgres traen mucho más que .message: el código SQLSTATE,
@@ -223,14 +218,14 @@ exports.handler = async (event) => {
       sourceError: e.sourceError?.message,
     };
     console.error('[recorridas] ERROR', JSON.stringify({
-      accion: (() => { try { return JSON.parse(event.body || '{}').accion; } catch { return null; } })(),
-      metodo: event.httpMethod,
-      query: event.queryStringParameters,
+      accion: (() => { try { return leerBody(req).accion; } catch { return null; } })(),
+      metodo: req.method,
+      query: req.query,
       pg,
     }));
     console.error('[recorridas] STACK', e.stack);
 
     // Se devuelven también al cliente: sin esto el front sólo ve un 500 pelado
-    return json(500, { error: e.message || 'Error sin mensaje', pg });
+    return res.status(500).json({ error: e.message || 'Error sin mensaje', pg });
   }
-};
+}
