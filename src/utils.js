@@ -12,8 +12,14 @@ export function distanciaKm(lat1,lng1,lat2,lng2){ return (distanciaM(lat1,lng1,l
 export function fmtHora(iso){ if(!iso)return"—"; return new Date(iso).toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"}); }
 export function fmtFecha(iso){ if(!iso)return"—"; return new Date(iso).toLocaleDateString("es-AR",{day:"2-digit",month:"2-digit",year:"numeric"}); }
 export function duracion(a,b){ if(!a||!b)return null; const m=Math.round((new Date(b)-new Date(a))/60000); return m<60?(m+" min"):(Math.floor(m/60)+"h "+( m%60)+"min"); }
-export function hoy(){ return new Date().toISOString().slice(0,10); }
-export function mesActual(){ return new Date().toISOString().slice(0,7); }
+// toISOString devuelve UTC: en Argentina (UTC-3) después de las 21:00 daba la
+// fecha de mañana, así que un registro cargado a la noche quedaba con el día
+// equivocado. Estas dos van por hora local.
+export function hoy(){
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+}
+export function mesActual(){ return hoy().slice(0,7); }
 
 // ─── PENDIENTES: vencimientos ────────────────────────────────────────────────
 // Días desde hoy hasta la fecha límite. Negativo = vencido, null = sin fecha.
