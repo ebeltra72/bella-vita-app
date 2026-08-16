@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { T, F } from "../theme";
 import { API } from "../api";
-import { fmtFecha, fmtHora } from "../utils";
+import { fmtFecha, fmtHora, mesActual } from "../utils";
+import { cumplimientoPlan, nombreMes } from "../plan/datos";
 import { Badge, Card } from "../ui";
 import {
   ESTADO_FILA, DIAS_VISITA_RECIENTE,
@@ -109,6 +110,32 @@ function Alertas({ alertas }) {
   );
 }
 
+// ─── Cumplimiento del plan ───────────────────────────────────────────────────
+// Sólo aparece cuando el mes en curso tiene un plan cargado. El cálculo viene
+// de src/plan/datos.js: una sola definición de "cumplido" en todo el sistema.
+function CumplimientoPlan({ cumpl }) {
+  const color = cumpl.pct >= 80 ? T.sage : cumpl.pct >= 50 ? T.amber : T.error;
+  return (
+    <Card>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:9 }}>
+        <div>
+          <div style={{ fontSize:13, fontWeight:600, color:T.text }}>Cumplimiento del plan</div>
+          <div style={{ fontSize:11, color:T.muted, textTransform:"capitalize" }}>{nombreMes(mesActual())}</div>
+        </div>
+        <span style={{ fontFamily:F.serif, fontSize:26, fontWeight:700, color }}>{cumpl.pct}%</span>
+      </div>
+      <div style={{ background:T.divider, borderRadius:99, height:8, overflow:"hidden" }}>
+        <div style={{ height:"100%", borderRadius:99, width:`${cumpl.pct}%`, background:color, transition:"width .3s" }}/>
+      </div>
+      <div style={{ fontSize:11, color:T.muted, marginTop:6, display:"flex", flexWrap:"wrap", gap:10 }}>
+        <span>{cumpl.realizadas} de {cumpl.total} recorridas</span>
+        {cumpl.incumplidas > 0 && <span style={{ color:T.error, fontWeight:600 }}>{cumpl.incumplidas} incumplidas</span>}
+        {cumpl.reprogramadas > 0 && <span style={{ color:T.amber }}>{cumpl.reprogramadas} reprogramadas</span>}
+      </div>
+    </Card>
+  );
+}
+
 // ─── Tabla semáforo ──────────────────────────────────────────────────────────
 function TablaSemaforo({ filas, onVerSucursal }) {
   return (
@@ -195,6 +222,7 @@ function TablaSemaforo({ filas, onVerSucursal }) {
 // ══════════════════════════════════════════════════════════════════════════════
 export default function DashboardPanel({ sucursales = [], visitas = [], onVerSucursal }) {
   const [pendientes, setPendientes] = useState([]);
+  const [recorridas, setRecorridas] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
 
@@ -209,11 +237,22 @@ export default function DashboardPanel({ sucursales = [], visitas = [], onVerSuc
     return () => { vigente = false; };
   }, []);
 
+  // Plan del mes en curso, para el cumplimiento. Si falla o no hay plan, el
+  // bloque no se muestra y el resto del dashboard funciona igual.
+  useEffect(() => {
+    let vigente = true;
+    API.getRecorridas(mesActual())
+      .then(rs => { if (vigente) setRecorridas(rs); })
+      .catch(() => { if (vigente) setRecorridas([]); });
+    return () => { vigente = false; };
+  }, []);
+
   if (cargando) return <div style={{ textAlign:"center", padding:40, color:T.muted }}>Cargando…</div>;
 
   const filas = filasSucursales(sucursales, visitas, pendientes);
   const resumen = resumenSemanal(sucursales, visitas, pendientes);
   const avisos = calcularAlertas(filas);
+  const cumpl = cumplimientoPlan(recorridas);
 
   return (
     <div style={{ padding:"18px 16px" }}>
@@ -225,6 +264,7 @@ export default function DashboardPanel({ sucursales = [], visitas = [], onVerSuc
 
       <Alertas alertas={avisos}/>
       <ResumenSemanal resumen={resumen}/>
+      {cumpl.hayPlan && <CumplimientoPlan cumpl={cumpl}/>}
       <TablaSemaforo filas={filas} onVerSucursal={onVerSucursal}/>
     </div>
   );

@@ -55,8 +55,8 @@ export const Label = ({ children }) => (
   </span>
 );
 
-export const Input = ({ type="text", value, onChange, placeholder, style: sx }) => (
-  <input type={type} value={value} onChange={onChange} placeholder={placeholder} style={{
+export const Input = ({ type="text", value, onChange, placeholder, style: sx, ...rest }) => (
+  <input type={type} value={value} onChange={onChange} placeholder={placeholder} {...rest} style={{
     width:"100%", padding:"11px 13px", borderRadius:12, border:`1.5px solid ${T.border}`,
     background:T.inputBg, fontSize:14, color:T.text, outline:"none", fontFamily:F.body, ...sx
   }}/>

@@ -114,7 +114,7 @@ export default function PendienteForm({
             placeholder="Describí el pendiente…"
             value={form.descripcion}
             onChange={e => set("descripcion", e.target.value)}
-            style={!descripcionOk ? { borderColor:T.border } : { borderColor:T.primary }}
+            style={{ border:`1.5px solid ${descripcionOk ? T.primary : T.border}` }}
           />
         </div>
 

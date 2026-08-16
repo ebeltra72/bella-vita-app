@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { T, F } from "../theme";
 import { RADIO_ACEPTADO_M } from "../constants";
 import { API } from "../api";
-import { distanciaM, fmtHora, fmtFecha, useGPS } from "../utils";
+import { distanciaM, fechaLocal, fmtHora, fmtFecha, useGPS } from "../utils";
 import { Badge, Btn, Card, Label, Select } from "../ui";
 import EncuestaVisita from "../encuesta/EncuestaVisita";
 import { descripcionSugerida, hallazgos as calcularHallazgos, resumenEncuesta } from "../encuesta/schema";
@@ -10,6 +10,7 @@ import InventarioForm from "./InventarioForm";
 import PendientesPrevios from "./PendientesPrevios";
 import CierreVisita, { faltantesCierre, dejoPendientes } from "./CierreVisita";
 import PendienteForm from "./PendienteForm";
+import MisRecorridas from "../plan/MisRecorridas";
 
 const CIERRE_VACIO = {
   semaforo: null, hallazgo: "", accionTomada: null, accionDetalle: "", dejoPendientes: null,
@@ -137,6 +138,16 @@ export default function VistaAdrian({ sucursales, equipo, visitas, setVisitas })
         });
       }
 
+      // Engancha la visita con su recorrida planificada, si había una. El
+      // servidor hace el matching por sucursal + fecha; si no hay ninguna no
+      // pasa nada, la visita simplemente no estaba en el plan. La fecha sale
+      // del check-in y no de hoy(), por si la visita cruzó la medianoche.
+      await API.vincularVisita({
+        visitaId: fin.id,
+        sucursalId: fin.sucursalId,
+        fecha: fechaLocal(fin.checkin),
+      });
+
       setVisitas(p => [fin, ...p]);
       setVisitaActual(null);
       setPorGuardar(null);
@@ -235,6 +246,35 @@ export default function VistaAdrian({ sucursales, equipo, visitas, setVisitas })
       onGuardar={guardarPendiente}
       onCancelar={() => setFormPendiente(null)}
     />
+  );
+
+  // Sub-tabs de la vista de Adrián. Sólo aparecen fuera de una visita en curso:
+  // durante la encuesta o el cierre no queremos que se salga del flujo.
+  const SubTabs = () => (
+    <div style={{ display:"flex", gap:8, marginBottom:18 }}>
+      {[["inicio","📍 Visita"],["recorridas","🗓 Mis recorridas"]].map(([f,l]) => (
+        <button key={f} onClick={() => setFase(f)} style={{
+          flex:1, padding:"10px 0", borderRadius:12, border:"none", cursor:"pointer",
+          fontFamily:F.body, fontSize:13, fontWeight:700,
+          background: fase===f ? T.primary : T.activeSoft,
+          color: fase===f ? T.white : T.primaryDeep,
+          boxShadow: fase===f ? T.shadowBtn : "none",
+          transition:"all .15s",
+        }}>{l}</button>
+      ))}
+    </div>
+  );
+
+  // ─── FASE: MIS RECORRIDAS ──────────────────────────────────────────────────
+  if (fase === "recorridas") return (
+    <div style={{ padding:"18px 16px" }}>
+      <SubTabs/>
+      <MisRecorridas
+        sucursales={sucursales}
+        visitas={visitas}
+        onIniciarVisita={(r) => { setSucursalId(String(r.sucursalId)); setFase("inicio"); }}
+      />
+    </div>
   );
 
   // ─── FASE: LISTO ───────────────────────────────────────────────────────────
@@ -351,6 +391,7 @@ export default function VistaAdrian({ sucursales, equipo, visitas, setVisitas })
   // ─── FASE: INICIO ──────────────────────────────────────────────────────────
   return (
     <div style={{ padding:"18px 16px" }}>
+      <SubTabs/>
       <div style={{ marginBottom:20 }}>
         <div style={{ fontFamily:F.serif, fontSize:26, fontWeight:700, color:T.primaryDeep, marginBottom:4 }}>
           Hola, Adrián 👋

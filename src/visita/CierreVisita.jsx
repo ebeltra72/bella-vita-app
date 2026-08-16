@@ -150,7 +150,7 @@ export default function CierreVisita({
           placeholder="Lo más importante que Ileana tiene que saber de esta visita…"
           value={cierre.hallazgo || ""}
           onChange={e => set("hallazgo", e.target.value)}
-          style={cierre.hallazgo?.trim() ? { borderColor:T.primary } : undefined}
+          style={cierre.hallazgo?.trim() ? { border:`1.5px solid ${T.primary}` } : undefined}
         />
         {hallazgos.length > 0 && (
           <div style={{ marginTop:10 }}>
@@ -187,7 +187,7 @@ export default function CierreVisita({
               placeholder="¿Cuál?"
               value={cierre.accionDetalle || ""}
               onChange={e => set("accionDetalle", e.target.value)}
-              style={cierre.accionDetalle?.trim() ? { borderColor:T.primary } : undefined}
+              style={cierre.accionDetalle?.trim() ? { border:`1.5px solid ${T.primary}` } : undefined}
             />
           </div>
         )}

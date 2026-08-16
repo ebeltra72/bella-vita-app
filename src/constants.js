@@ -108,3 +108,35 @@ export const SEMAFORO = [
 // Busca en cualquiera de las listas de arriba
 export const opcion = (lista, id) => lista.find(x => x.id === id) || null;
 export const etiqueta = (lista, id) => opcion(lista, id)?.label || id || "—";
+
+// ─── RECORRIDAS (Fase 3) ─────────────────────────────────────────────────────
+// Los `id` son los valores que aceptan los CHECK de recorridas_plan.
+
+// Son etiquetas de intención, sin semántica horaria: no se validan contra la
+// hora real del check-in. El orden del array es el orden de desempate que usa
+// el matching automático del check-out.
+export const FRANJAS = [
+  { id: "apertura",   label: "Apertura",   icono: "🌅" },
+  { id: "intermedio", label: "Intermedio", icono: "☀️" },
+  { id: "cierre",     label: "Cierre",     icono: "🌆" },
+];
+
+export const ESTADOS_RECORRIDA = [
+  { id: "planificada",  label: "Planificada",  badge: "terr"  },
+  { id: "realizada",    label: "Realizada",    badge: "sage"  },
+  { id: "reprogramada", label: "Reprogramada", badge: "amber" },
+  { id: "cancelada",    label: "Cancelada",    badge: "terr"  },
+];
+
+// Estados abiertos: siguen esperando que la visita ocurra
+export const RECORRIDAS_ABIERTAS = ["planificada", "reprogramada"];
+
+// Estado derivado en el cliente, no vive en la base. "incumplida" es una
+// recorrida abierta cuya fecha ya pasó, mismo criterio que "vencido" en
+// pendientes.
+export const ESTADO_DERIVADO = {
+  realizada:  { label: "Realizada",  badge: "sage",  icono: "✓" },
+  pendiente:  { label: "Pendiente",  badge: "terr",  icono: "○" },
+  incumplida: { label: "Incumplida", badge: "error", icono: "✕" },
+  cancelada:  { label: "Cancelada",  badge: "terr",  icono: "–" },
+};

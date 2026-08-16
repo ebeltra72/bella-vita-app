@@ -92,7 +92,67 @@ export const API = {
     const r = await postPendientes({ accion: 'seguimiento', id, texto, autor });
     return r.pendiente ? mapPendiente(r.pendiente) : null;
   },
+
+  // ─── RECORRIDAS ────────────────────────────────────────────────────────────
+  async getRecorridas(mes) {
+    const r = await fetch(`/.netlify/functions/recorridas?mes=${encodeURIComponent(mes)}`);
+    if (!r.ok) throw new Error('Error al cargar el plan de recorridas');
+    return (await r.json()).map(mapRecorrida);
+  },
+
+  async crearRecorridas(recorridas) {
+    if (!recorridas?.length) return { ok: true, creadas: 0 };
+    return postRecorridas({ accion: 'crear_plan', recorridas });
+  },
+
+  async aprobarPlan(mes) {
+    return postRecorridas({ accion: 'aprobar', mes });
+  },
+
+  async actualizarRecorrida({ id, estado, fechaPlan, motivoReprogramacion }) {
+    const r = await postRecorridas({ accion: 'actualizar_estado', id, estado, fechaPlan, motivoReprogramacion });
+    return r.recorrida ? mapRecorrida(r.recorrida) : null;
+  },
+
+  // Se llama al cerrar la visita. El servidor busca la recorrida que
+  // corresponde; si no hay ninguna, devuelve null y no es un error.
+  async vincularVisita({ visitaId, sucursalId, fecha }) {
+    const r = await postRecorridas({ accion: 'vincular_visita', visitaId, sucursalId, fecha });
+    return r.recorrida ? mapRecorrida(r.recorrida) : null;
+  },
 };
+
+// ─── HELPERS DE RECORRIDAS ───────────────────────────────────────────────────
+function mapRecorrida(r) {
+  return {
+    id: r.id,
+    mes: r.mes,
+    sucursalId: r.sucursal_id,
+    sucursalNombre: r.sucursal_nombre,
+    fechaPlan: r.fecha_plan?.slice(0, 10) || null,
+    fechaPlanOriginal: r.fecha_plan_original?.slice(0, 10) || null,
+    franja: r.franja,
+    estado: r.estado,
+    visitaId: r.visita_id,
+    aprobado: r.aprobado_por_ileana,
+    aprobadoEn: r.aprobado_en,
+    motivoReprogramacion: r.motivo_reprogramacion,
+    creadoEn: r.creado_en,
+    actualizadoEn: r.actualizado_en,
+    // Sólo viene en el GET: visita del mismo día y sucursal que quedó sin
+    // vincular, para poder ofrecer el enganche con un tap
+    visitaProbable: r.visita_probable ?? null,
+  };
+}
+
+async function postRecorridas(body) {
+  const r = await fetch('/.netlify/functions/recorridas', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || 'Error al guardar el plan');
+  return data;
+}
 
 // ─── HELPERS DE PENDIENTES ───────────────────────────────────────────────────
 function mapPendiente(p) {

@@ -13,24 +13,64 @@ export function distanciaKm(lat1,lng1,lat2,lng2){ return (distanciaM(lat1,lng1,l
 export function fmtHora(iso){ if(!iso)return"—"; return new Date(iso).toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"}); }
 export function fmtFecha(iso){ if(!iso)return"—"; return new Date(iso).toLocaleDateString("es-AR",{day:"2-digit",month:"2-digit",year:"numeric"}); }
 export function duracion(a,b){ if(!a||!b)return null; const m=Math.round((new Date(b)-new Date(a))/60000); return m<60?(m+" min"):(Math.floor(m/60)+"h "+( m%60)+"min"); }
+// ─── FECHAS EN HORA LOCAL ────────────────────────────────────────────────────
 // toISOString devuelve UTC: en Argentina (UTC-3) después de las 21:00 daba la
 // fecha de mañana, así que un registro cargado a la noche quedaba con el día
-// equivocado. Estas dos van por hora local.
-export function hoy(){
-  const d = new Date();
+// equivocado. Todo lo que sea "qué día es" pasa por acá.
+
+// Una fecha cualquiera → "YYYY-MM-DD" en hora local
+export function fechaLocal(x) {
+  if (!x) return null;
+  const d = new Date(x);
+  if (isNaN(d)) return null;
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 }
+export function hoy(){ return fechaLocal(new Date()); }
 export function mesActual(){ return hoy().slice(0,7); }
+
+// Medianoche local de una fecha, para comparar días sin que la hora moleste
+function medianoche(x) {
+  const d = new Date(x);
+  if (isNaN(d)) return null;
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+// Días completos transcurridos desde una fecha hasta hoy.
+// Positivo = pasado, negativo = futuro, null = sin fecha o fecha inválida.
+// Compara medianoche contra medianoche: algo de ayer a las 23:00 es 1 día, no 0.
+export function diasDesde(fecha, ref = new Date()) {
+  if (!fecha) return null;
+  const s = String(fecha);
+  // Hay que distinguir dos cosas que llegan acá:
+  //   · "YYYY-MM-DD" es una fecha de calendario (columnas DATE como fecha_limite
+  //     o fecha_plan). Se interpreta en hora local, sin correrla de día.
+  //   · un timestamp completo (checkin) se lleva a su medianoche LOCAL. Recortarlo
+  //     a 10 caracteres daría la fecha UTC: una visita de ayer a las 23:00 en
+  //     Argentina tiene ISO de hoy, y contaría 0 días en vez de 1.
+  const base = /^\d{4}-\d{2}-\d{2}$/.test(s) ? `${s}T00:00:00` : fecha;
+  const a = medianoche(base);
+  const b = medianoche(ref);
+  if (!a || !b) return null;
+  return Math.round((b - a) / 86400000);
+}
+
+// Lunes 00:00 de la semana de `ref`, en hora local.
+// No se reusa semanaKey(): ésa calcula la rotación de rubros del inventario,
+// que es otra cosa y arranca los años en otro día.
+export function inicioSemana(ref = new Date()) {
+  const d = medianoche(ref);
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));   // lunes → 0, domingo → 6
+  return d;
+}
 
 // ─── PENDIENTES: vencimientos ────────────────────────────────────────────────
 // Días desde hoy hasta la fecha límite. Negativo = vencido, null = sin fecha.
+// Es exactamente el inverso de diasDesde, así que se deriva en vez de repetir
+// la aritmética de fechas.
 export function diasRestantes(fechaLimite) {
-  if (!fechaLimite) return null;
-  const limite = new Date(`${String(fechaLimite).slice(0, 10)}T00:00:00`);
-  if (isNaN(limite)) return null;
-  const hoyD = new Date();
-  hoyD.setHours(0, 0, 0, 0);
-  return Math.round((limite - hoyD) / 86400000);
+  const d = diasDesde(fechaLimite);
+  return d === null ? null : -d;
 }
 
 export function estaVencido(pendiente) {

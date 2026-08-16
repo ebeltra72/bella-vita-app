@@ -1,5 +1,5 @@
 import { ESTADOS_CERRADOS } from "../constants";
-import { estaVencido } from "../utils";
+import { diasDesde, estaVencido, inicioSemana } from "../utils";
 
 // ══════════════════════════════════════════════════════════════════════════════
 // DERIVACIONES DEL DASHBOARD
@@ -26,29 +26,8 @@ export const ESTADO_FILA = {
   sin_problemas: { icono:"🟢", label:"Sin problemas",           badge:"sage",  orden:4 },
 };
 
-// ─── Fechas ──────────────────────────────────────────────────────────────────
-
-// Lunes 00:00 de la semana en curso, en hora local.
-// No se reusa semanaKey() de utils: ésa calcula la rotación de rubros del
-// inventario, que es otra cosa y arranca los años en otro día.
-export function inicioSemana(ref = new Date()) {
-  const d = new Date(ref);
-  d.setHours(0, 0, 0, 0);
-  const desdeLunes = (d.getDay() + 6) % 7;   // lunes → 0, domingo → 6
-  d.setDate(d.getDate() - desdeLunes);
-  return d;
-}
-
-// Días completos entre una fecha y hoy, comparando medianoche local contra
-// medianoche local: una visita de ayer a las 23:00 son 1 día, no 0.
-export function diasDesde(fecha, ref = new Date()) {
-  if (!fecha) return null;
-  const f = new Date(fecha);
-  if (isNaN(f)) return null;
-  const a = new Date(f); a.setHours(0, 0, 0, 0);
-  const b = new Date(ref); b.setHours(0, 0, 0, 0);
-  return Math.round((b - a) / 86400000);
-}
+// inicioSemana() y diasDesde() viven en utils.js: son aritmética de fechas
+// genérica y también las usa src/plan.
 
 const fechaValida = (x) => { const d = new Date(x); return isNaN(d) ? null : d; };
 

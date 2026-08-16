@@ -74,7 +74,7 @@ function CamposExtra({ pregunta, respuesta, visitaId, sucursalNombre, onCampo })
                 placeholder={campo.placeholder}
                 value={valor}
                 onChange={e => onCampo(clave, e.target.value)}
-                style={falta ? { borderColor:T.error } : undefined}
+                style={falta ? { border:`1.5px solid ${T.error}` } : undefined}
               />
             ) : (
               <Textarea
@@ -82,7 +82,7 @@ function CamposExtra({ pregunta, respuesta, visitaId, sucursalNombre, onCampo })
                 placeholder={campo.placeholder}
                 value={valor}
                 onChange={e => onCampo(clave, e.target.value)}
-                style={falta ? { borderColor:T.error } : undefined}
+                style={falta ? { border:`1.5px solid ${T.error}` } : undefined}
               />
             )}
           </div>
