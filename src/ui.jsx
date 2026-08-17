@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { T, F } from "./theme";
 import { API } from "./api";
+import { necesitaAchicar, prepararFoto } from "./imagen";
 
 // ─── UI PRIMITIVES ───────────────────────────────────────────────────────────
 export const Badge = ({ color, children }) => {
@@ -90,34 +91,36 @@ export const ProgressBar = ({ val, max }) => {
 
 // ─── FOTO UPLOADER ───────────────────────────────────────────────────────────
 export function FotoUploader({ visitaId, sucursal, tipo, value, onChange }) {
-  const [subiendo, setSubiendo] = useState(false);
+  const [estado, setEstado] = useState(null);   // 'optimizando' | 'subiendo'
   const [error, setError] = useState(null);
+  const subiendo = estado !== null;
 
   const handleFile = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setSubiendo(true); setError(null);
+    setError(null);
     try {
-      const reader = new FileReader();
-      reader.onload = async (ev) => {
-        try {
-          const result = await API.uploadFoto({
-            data: ev.target.result,
-            visitaId: visitaId || Date.now(),
-            sucursal: sucursal || "sucursal",
-            tipo,
-          });
-          onChange(result.url);
-        } catch (err) {
-          setError("No se pudo subir la foto. Intentá de nuevo.");
-        } finally {
-          setSubiendo(false);
-        }
-      };
-      reader.readAsDataURL(file);
-    } catch {
-      setError("Error al leer el archivo.");
-      setSubiendo(false);
+      // Las fotos de más de 3,4 MB se achican en el navegador: por encima de eso
+      // el data URL en base64 supera el límite de 4,5 MB de Vercel y el upload
+      // rebota con 413. Ver src/imagen.js.
+      setEstado(necesitaAchicar(file) ? "optimizando" : "subiendo");
+      const { dataUrl } = await prepararFoto(file);
+
+      setEstado("subiendo");
+      const result = await API.uploadFoto({
+        data: dataUrl,
+        visitaId: visitaId || Date.now(),
+        sucursal: sucursal || "sucursal",
+        tipo,
+      });
+      onChange(result.url);
+    } catch (err) {
+      setError(err.message || "No se pudo subir la foto. Intentá de nuevo.");
+    } finally {
+      setEstado(null);
+      // Permite reintentar con el mismo archivo: sin esto el input no dispara
+      // change de nuevo si se vuelve a elegir la misma foto.
+      e.target.value = "";
     }
   };
 
@@ -140,7 +143,9 @@ export function FotoUploader({ visitaId, sucursal, tipo, value, onChange }) {
       }}>
         <input type="file" accept="image/*" capture="environment" onChange={handleFile} style={{ display:"none" }}/>
         {subiendo ? (
-          <div style={{ fontSize:13, color:T.primary }}>Subiendo foto…</div>
+          <div style={{ fontSize:13, color:T.primary }}>
+            {estado === "optimizando" ? "Optimizando foto…" : "Subiendo foto…"}
+          </div>
         ) : (
           <>
             <span style={{ fontSize:28 }}>📷</span>
