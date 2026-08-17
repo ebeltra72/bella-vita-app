@@ -27,7 +27,7 @@ export default async function handler(req, res) {
   cors(res);
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  const sql = neon(process.env.DATABASE_URL);
+  const sql = neon(process.env.NEON_URL);
 
   // DIAGNÓSTICO TEMPORAL — Fase 3
   // Si esta línea NO aparece en los logs de Vercel, el problema no está en el
@@ -38,7 +38,7 @@ export default async function handler(req, res) {
     metodo: req.method,
     query: req.query || null,
     body: req.method === 'POST' ? JSON.stringify(leerBody(req)).slice(0, 300) : null,
-    tieneDbUrl: !!process.env.DATABASE_URL,
+    tieneNeonUrl: !!process.env.NEON_URL,
   }));
 
   try {

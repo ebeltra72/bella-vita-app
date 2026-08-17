@@ -5,7 +5,7 @@ export default async function handler(req, res) {
   cors(res);
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  const sql = neon(process.env.DATABASE_URL);
+  const sql = neon(process.env.NEON_URL);
 
   try {
     if (req.method === 'GET') {
