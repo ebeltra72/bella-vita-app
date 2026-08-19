@@ -140,3 +140,15 @@ export const ESTADO_DERIVADO = {
   incumplida: { label: "Incumplida", badge: "error", icono: "✕" },
   cancelada:  { label: "Cancelada",  badge: "terr",  icono: "–" },
 };
+
+// ─── PERSONAL (Fase 4) ───────────────────────────────────────────────────────
+// Los `id` son los valores que acepta el CHECK de personal.rol. El orden del
+// array es el orden en que se agrupa, tanto en el checklist de presencia como
+// en la cobertura: el mismo que el ORDER BY de api/personal.js.
+export const ROLES = [
+  { id: "operadora",     label: "Operadoras",     singular: "Operadora",     icono: "✨" },
+  { id: "recepcionista", label: "Recepción",      singular: "Recepcionista", icono: "💁" },
+  { id: "cosmiatra",     label: "Cosmiatras",     singular: "Cosmiatra",     icono: "🧖" },
+  { id: "medica",        label: "Médicas",        singular: "Médica",        icono: "🩺" },
+  { id: "telefono",      label: "Teléfono",       singular: "Teléfono",      icono: "📞" },
+];

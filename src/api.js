@@ -144,6 +144,56 @@ export const API = {
     const r = await postRecorridas({ accion: 'vincular_visita', visitaId, sucursalId, fecha });
     return r.recorrida ? mapRecorrida(r.recorrida) : null;
   },
+
+  // ─── PERSONAL ──────────────────────────────────────────────────────────────
+  // El plantel rota entre las 7 sucursales: no hay asignación fija, la presencia
+  // se marca visita por visita.
+  async getPersonal({ todos = false } = {}) {
+    const r = await fetch('/api/personal' + (todos ? '?todos=1' : ''));
+    if (!r.ok) throw new Error('Error al cargar el plantel');
+    return (await r.json()).map(mapPersona);
+  },
+
+  // Presencia ya guardada en una visita. Durante la visita en curso la presencia
+  // vive en memoria, así que esto sólo hace falta para revisarla después.
+  async getPresencia(visitaId) {
+    const r = await fetch(`/api/personal?visita_id=${encodeURIComponent(visitaId)}`);
+    if (!r.ok) throw new Error('Error al cargar la presencia de la visita');
+    return (await r.json()).map(Number);
+  },
+
+  async getCobertura(mes) {
+    const r = await fetch(`/api/personal?mes=${encodeURIComponent(mes)}`);
+    if (!r.ok) throw new Error('Error al cargar la cobertura de personal');
+    const c = await r.json();
+    return {
+      mes: c.mes,
+      totalVisitas: c.total_visitas || 0,
+      visitasConPresencia: c.visitas_con_presencia || 0,
+      franjas: c.franjas || {},
+      personas: (c.personas || []).map(p => ({
+        ...mapPersona(p),
+        visitas: p.visitas, aperturas: p.aperturas, cierres: p.cierres,
+      })),
+    };
+  },
+
+  // La lista es el estado final, no un agregado: quien no viene en `personas`
+  // se borra. Por eso sirve igual para la carga original que para una edición,
+  // y reintentar el check-out no duplica nada.
+  async registrarPresencia({ visitaId, personas }) {
+    return postPersonal({ accion: 'registrar_presencia', visita_id: visitaId, personas: personas || [] });
+  },
+
+  async agregarPersona({ nombre, rol }) {
+    const r = await postPersonal({ accion: 'agregar', id: Date.now(), nombre, rol });
+    return r.persona ? mapPersona(r.persona) : null;
+  },
+
+  async desactivarPersona(id) {
+    const r = await postPersonal({ accion: 'desactivar', id });
+    return r.persona ? mapPersona(r.persona) : null;
+  },
 };
 
 // ─── HELPERS DE RECORRIDAS ───────────────────────────────────────────────────
@@ -198,3 +248,26 @@ function mapPendiente(p) {
 
 const postPendientes = (body) =>
   post('/api/pendientes', body, 'No se pudo guardar el pendiente');
+
+// ─── HELPERS DE PERSONAL ─────────────────────────────────────────────────────
+// id se normaliza a número: Postgres devuelve los BIGINT como string y del otro
+// lado se comparan contra los ids tildados en el checklist de presencia. Los
+// ids son 1-28 o Date.now(), muy por debajo de MAX_SAFE_INTEGER.
+function mapPersona(p) {
+  return {
+    id: Number(p.id),
+    nombre: p.nombre,
+    rol: p.rol,
+    activo: p.activo,
+    creadoEn: p.creado_en,
+  };
+}
+
+const CONTEXTO_PERSONAL = {
+  registrar_presencia: 'No se pudo guardar la presencia',
+  agregar:             'No se pudo agregar a la persona',
+  desactivar:          'No se pudo dar de baja a la persona',
+};
+
+const postPersonal = (body) =>
+  post('/api/personal', body, CONTEXTO_PERSONAL[body.accion] || 'No se pudo guardar el plantel');

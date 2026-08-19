@@ -8,6 +8,7 @@ import EncuestaVisita from "../encuesta/EncuestaVisita";
 import { descripcionSugerida, hallazgos as calcularHallazgos, resumenEncuesta } from "../encuesta/schema";
 import InventarioForm from "./InventarioForm";
 import PendientesPrevios from "./PendientesPrevios";
+import PresenciaPersonal from "./PresenciaPersonal";
 import CierreVisita, { faltantesCierre, dejoPendientes } from "./CierreVisita";
 import PendienteForm from "./PendienteForm";
 import MisRecorridas from "../plan/MisRecorridas";
@@ -19,11 +20,12 @@ const CIERRE_VACIO = {
 // ══════════════════════════════════════════════════════════════════════════════
 // VISTA ADRIÁN
 //
-//   inicio ──check-in──► pendientes ──► encuesta ──► cierre ──check-out──► listo
+//   inicio ─check-in─► pendientes ─► presencia ─► encuesta ─► cierre ─check-out─► listo
 //
-// Todo lo que se genera durante la visita (respuestas, pendientes nuevos y
-// resoluciones de pendientes viejos) vive en memoria y se persiste recién en el
-// check-out. Una visita abandonada a mitad no deja nada suelto en la base.
+// Todo lo que se genera durante la visita (respuestas, presencia del personal,
+// pendientes nuevos y resoluciones de pendientes viejos) vive en memoria y se
+// persiste recién en el check-out. Una visita abandonada a mitad no deja nada
+// suelto en la base.
 // ══════════════════════════════════════════════════════════════════════════════
 export default function VistaAdrian({ sucursales, equipo, visitas, setVisitas }) {
   const [fase, setFase] = useState("inicio");
@@ -31,6 +33,12 @@ export default function VistaAdrian({ sucursales, equipo, visitas, setVisitas })
   const [visitaActual, setVisitaActual] = useState(null);
   const [respuestas, setRespuestas] = useState({});
   const [inventariosVisita, setInventariosVisita] = useState([]);
+
+  // Presencia: el plantel activo y quiénes estaban hoy en esta sucursal
+  const [personal, setPersonal] = useState([]);
+  const [cargandoPersonal, setCargandoPersonal] = useState(false);
+  const [presentes, setPresentes] = useState([]);
+  const [presenciaConfirmada, setPresenciaConfirmada] = useState(false);
 
   // Pendientes: los que ya existían, lo que Adrián hizo con ellos, y los nuevos
   const [pendientesPrevios, setPendientesPrevios] = useState([]);
@@ -81,6 +89,8 @@ export default function VistaAdrian({ sucursales, equipo, visitas, setVisitas })
     setRespuestas({});
     setPendientesNuevos([]);
     setResoluciones({});
+    setPresentes([]);
+    setPresenciaConfirmada(false);
     setCierre(CIERRE_VACIO);
     setErrorGuardado(null);
     setPorGuardar(null);
@@ -90,6 +100,14 @@ export default function VistaAdrian({ sucursales, equipo, visitas, setVisitas })
       .then(setPendientesPrevios)
       .catch(() => setPendientesPrevios([]))
       .finally(() => setCargandoPrevios(false));
+
+    // El plantel rota entre las 7 sucursales, así que se pide entero y sin
+    // filtrar: no hay lista fija por sucursal.
+    setCargandoPersonal(true);
+    API.getPersonal()
+      .then(setPersonal)
+      .catch(() => setPersonal([]))
+      .finally(() => setCargandoPersonal(false));
 
     API.getInventarios(sucursal.id)
       .then(rows => setInventariosVisita(rows.map(r => ({
@@ -125,6 +143,12 @@ export default function VistaAdrian({ sucursales, equipo, visitas, setVisitas })
     setGuardando(true); setErrorGuardado(null);
     try {
       await API.saveVisita(fin);
+
+      // Después de la visita y no antes: visita_personal tiene un FK contra
+      // visitas, así que la fila de la visita tiene que existir primero. La
+      // lista es el estado final, no un agregado, así que reintentar el
+      // check-out la deja igual en vez de duplicarla.
+      await API.registrarPresencia({ visitaId: fin.id, personas: presentes });
 
       if (pendientesNuevos.length > 0) {
         await API.crearPendientes(pendientesNuevos.map(p => ({ ...p, visitaId: fin.id })));
@@ -177,6 +201,7 @@ export default function VistaAdrian({ sucursales, equipo, visitas, setVisitas })
   const reset = () => {
     setFase("inicio"); setSucursalId(""); setSinPermiso(false);
     setPendientesPrevios([]); setPendientesNuevos([]); setResoluciones({});
+    setPresentes([]); setPresenciaConfirmada(false);
     setCierre(CIERRE_VACIO); setErrorGuardado(null); setPorGuardar(null);
     setAvisoVinculo(null);
   };
@@ -302,6 +327,7 @@ export default function VistaAdrian({ sucursales, equipo, visitas, setVisitas })
           La información quedó guardada correctamente.
           {pendientesNuevos.length > 0 && <><br/>Se crearon {pendientesNuevos.length} {pendientesNuevos.length === 1 ? "pendiente" : "pendientes"}.</>}
           {resueltos > 0 && <><br/>Se cerraron {resueltos} {resueltos === 1 ? "pendiente anterior" : "pendientes anteriores"}.</>}
+          {presentes.length > 0 && <><br/>Se registró la presencia de {presentes.length} {presentes.length === 1 ? "persona" : "personas"}.</>}
         </div>
         {avisoVinculo && (
           <div style={{
@@ -329,7 +355,24 @@ export default function VistaAdrian({ sucursales, equipo, visitas, setVisitas })
         cargando={cargandoPrevios}
         resoluciones={resoluciones}
         setResoluciones={setResoluciones}
-        onContinuar={() => setFase("encuesta")}
+        onContinuar={() => setFase("presencia")}
+      />
+    </div>
+  );
+
+  // ─── FASE: PRESENCIA DE PERSONAL ───────────────────────────────────────────
+  if (fase === "presencia") return (
+    <div style={{ padding:"18px 16px" }}>
+      <Cabecera/>
+      <PresenciaPersonal
+        personal={personal}
+        cargando={cargandoPersonal}
+        presentes={presentes}
+        setPresentes={setPresentes}
+        confirmada={presenciaConfirmada}
+        onConfirmar={() => { setPresenciaConfirmada(true); setFase("encuesta"); }}
+        onAgregada={(p) => setPersonal(prev => [...prev, p])}
+        onVolver={() => setFase("pendientes")}
       />
     </div>
   );
@@ -357,8 +400,8 @@ export default function VistaAdrian({ sucursales, equipo, visitas, setVisitas })
       </Card>
 
       <Btn onClick={() => setFase("cierre")}>Continuar al cierre →</Btn>
-      <Btn variant="ghost" onClick={() => setFase("pendientes")} style={{ marginTop:8 }}>
-        ← Volver a pendientes
+      <Btn variant="ghost" onClick={() => setFase("presencia")} style={{ marginTop:8 }}>
+        ← Volver a presencia
       </Btn>
 
       {modal}

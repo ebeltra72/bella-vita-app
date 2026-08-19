@@ -11,6 +11,7 @@ import DashboardPanel from "./dashboard/DashboardPanel";
 import PlanPanel from "./plan/PlanPanel";
 import HistorialPanel from "./paneles/HistorialPanel";
 import PendientesPanel from "./paneles/PendientesPanel";
+import CoberturaPanel from "./paneles/CoberturaPanel";
 import GestionComercialPanel from "./paneles/GestionComercialPanel";
 import EncuestaPanel from "./paneles/EncuestaPanel";
 import SucursalesPanel from "./paneles/SucursalesPanel";
@@ -49,7 +50,7 @@ export default function App() {
     setTabIleana("historial");
   };
 
-  const TABS   = [["dashboard","📊 Dashboard"],["plan","🗓 Plan"],["historial","📋 Visitas"],["pendientes","⚠ Pendientes"],["gestion","💜 Comercial"],["inventario","📦 Stock"],["encuesta","📝 Encuesta"],["sucursales","📍 Sucursales"],["km","🚗 Km"],["miembros","👥 Equipo"]];
+  const TABS   = [["dashboard","📊 Dashboard"],["plan","🗓 Plan"],["historial","📋 Visitas"],["cobertura","👥 Cobertura"],["pendientes","⚠ Pendientes"],["gestion","💜 Comercial"],["inventario","📦 Stock"],["encuesta","📝 Encuesta"],["sucursales","📍 Sucursales"],["km","🚗 Km"],["miembros","👥 Equipo"]];
 
   return (
     <div style={{ minHeight:"100vh", background:T.bgApp, fontFamily:F.body, color:T.text, WebkitFontSmoothing:"antialiased" }}>
@@ -103,6 +104,7 @@ export default function App() {
           {tabIleana==="dashboard"  && <DashboardPanel sucursales={sucursales} visitas={visitas} onVerSucursal={verSucursal}/>}
           {tabIleana==="plan"       && <PlanPanel sucursales={sucursales}/>}
           {tabIleana==="historial"  && <HistorialPanel visitas={visitas} preguntas={preguntas} foco={foco}/>}
+          {tabIleana==="cobertura"  && <CoberturaPanel/>}
           {tabIleana==="pendientes" && <PendientesPanel sucursales={sucursales} equipo={equipo}/>}
           {tabIleana==="gestion"    && <GestionComercialPanel registros={registros} equipo={equipo} meta={meta} setMeta={setMeta}/>}
           {tabIleana==="encuesta"   && <EncuestaPanel/>}

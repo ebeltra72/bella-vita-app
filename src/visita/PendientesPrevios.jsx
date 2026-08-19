@@ -54,7 +54,7 @@ export default function PendientesPrevios({
           Esta sucursal no arrastra nada de visitas anteriores.
         </div>
       </Card>
-      <Btn onClick={onContinuar}>Comenzar la encuesta →</Btn>
+      <Btn onClick={onContinuar}>Continuar →</Btn>
     </>
   );
 
@@ -156,7 +156,7 @@ export default function PendientesPrevios({
         </div>
       )}
 
-      <Btn onClick={onContinuar}>Comenzar la encuesta →</Btn>
+      <Btn onClick={onContinuar}>Continuar →</Btn>
     </>
   );
 }
