@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { T, F } from "../theme";
 import { API } from "../api";
-import { diasDesde, fmtFecha, fmtHora, mesActual } from "../utils";
+import { fmtFecha, fmtHora, mesActual } from "../utils";
 import { cumplimientoPlan, nombreMes } from "../plan/datos";
 import { Badge, Card } from "../ui";
 import {
@@ -115,41 +115,61 @@ function Alertas({ alertas, hayStock }) {
 }
 
 // ─── Alertas de stock ────────────────────────────────────────────────────────
-// Vienen derivadas del GET de inventarios y ya ordenadas por antigüedad: las
-// más viejas primero. No hay tabla de alertas ni botón de resolver — una alerta
-// desaparece cuando el control siguiente muestra el producto repuesto.
+// Un resumen por sucursal, sin detalle de productos: el Dashboard responde
+// "¿dónde hay que mirar?" y el detalle vive en la pestaña Stock, que además
+// permite bajar a la sucursal. Con mínimos definidos en todo el catálogo, el
+// listado completo eran cincuenta filas que tapaban el resto del tablero.
 //
-// La antigüedad es la del control que la detecta, no la de "cuándo empezó a
-// faltar": sin estado persistido no hay forma de saber lo segundo. En la
-// práctica ordena igual, porque el control más viejo es el que lleva más tiempo
-// sin corregirse.
-function AlertasStock({ alertas }) {
-  if (alertas.length === 0) return null;
+// Las alertas se derivan del GET de inventarios: no hay tabla ni botón de
+// resolver, una alerta desaparece cuando el control siguiente muestra el
+// producto repuesto.
+function AlertasStock({ alertas, hayMinimos }) {
+  // Sin mínimos definidos no hay nada que afirmar: ni que falta stock ni que
+  // está todo bien. El bloque no aparece hasta que haya algo configurado.
+  if (!hayMinimos) return null;
+
+  if (alertas.length === 0) return (
+    <Card style={{ background:T.sageBg, border:`1px solid ${T.sage}33` }}>
+      <div style={{ display:"flex", alignItems:"center", gap:9 }}>
+        <span style={{ fontSize:20 }}>✓</span>
+        <div style={{ fontSize:14, fontWeight:700, color:T.sage }}>
+          Todo el stock sobre mínimo
+        </div>
+      </div>
+    </Card>
+  );
+
+  // Las alertas ya vienen ordenadas del servidor; acá el orden es por cantidad
+  // de faltantes, que es lo único que muestra esta vista.
+  const porSucursal = [];
+  for (const a of alertas) {
+    let g = porSucursal.find(x => String(x.sucursalId) === String(a.sucursalId));
+    if (!g) { g = { sucursalId: a.sucursalId, sucursalNombre: a.sucursalNombre, total: 0 }; porSucursal.push(g); }
+    g.total++;
+  }
+  porSucursal.sort((a, b) =>
+    b.total - a.total || a.sucursalNombre.localeCompare(b.sucursalNombre, "es"));
 
   return (
     <Card style={{ background:T.errorBg, border:`1px solid ${T.error}44` }}>
       <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:10 }}>
         <span style={{ fontSize:17 }}>📦</span>
         <span style={{ fontSize:14, fontWeight:700, color:T.error }}>
-          {alertas.length} {alertas.length === 1 ? "producto bajo mínimo" : "productos bajo mínimo"}
+          Stock bajo mínimo en {porSucursal.length} {porSucursal.length === 1 ? "sucursal" : "sucursales"}
         </span>
       </div>
 
       <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
-        {alertas.map(a => (
-          <div key={`${a.sucursalId}-${a.producto}`} style={{
+        {porSucursal.map(g => (
+          <div key={g.sucursalId} style={{
             display:"flex", alignItems:"center", justifyContent:"space-between", gap:10,
-            background:T.white, borderRadius:12, padding:"9px 12px",
+            background:T.white, borderRadius:12, padding:"10px 12px",
           }}>
-            <div style={{ minWidth:0 }}>
-              <div style={{ fontSize:13, fontWeight:600, color:T.text }}>{a.producto}</div>
-              <div style={{ fontSize:11, color:T.muted, marginTop:2 }}>
-                {a.sucursalNombre} · {textoAntiguedad(diasDesde(a.fecha))}
-              </div>
-            </div>
-            <span style={{ whiteSpace:"nowrap", flexShrink:0 }}>
-              <strong style={{ fontFamily:F.serif, fontSize:17, color:T.error }}>{a.cantidad}</strong>
-              <span style={{ fontSize:12, color:T.muted }}> de {a.minimo}</span>
+            <span style={{ fontSize:13, fontWeight:700, color:T.text, minWidth:0 }}>
+              {g.sucursalNombre}
+            </span>
+            <span style={{ fontSize:12, fontWeight:700, color:T.error, whiteSpace:"nowrap", flexShrink:0 }}>
+              {g.total} {g.total === 1 ? "producto bajo mínimo" : "productos bajo mínimo"}
             </span>
           </div>
         ))}
@@ -272,6 +292,10 @@ export default function DashboardPanel({ sucursales = [], visitas = [], onVerSuc
   const [pendientes, setPendientes] = useState([]);
   const [recorridas, setRecorridas] = useState([]);
   const [alertasStock, setAlertasStock] = useState([]);
+  // Los mínimos sólo se usan para saber si hay algo configurado: sin ninguno,
+  // el bloque de stock no dice nada y no se muestra.
+  const [hayMinimos, setHayMinimos] = useState(false);
+  const [stockOk, setStockOk] = useState(false);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
 
@@ -301,9 +325,20 @@ export default function DashboardPanel({ sucursales = [], visitas = [], onVerSuc
   // resto del dashboard funciona igual.
   useEffect(() => {
     let vigente = true;
-    API.getAlertasStock()
-      .then(rows => { if (vigente) setAlertasStock(rows); })
-      .catch(() => { if (vigente) setAlertasStock([]); });
+    // Si cualquiera de las dos falla, stockOk queda en false y el bloque no se
+    // muestra: un "todo el stock sobre mínimo" que en realidad es "no se pudo
+    // calcular" sería la única parte del tablero que miente en verde.
+    Promise.all([API.getAlertasStock(), API.getMinimos()])
+      .then(([rows, minimos]) => {
+        if (!vigente) return;
+        setAlertasStock(rows);
+        setHayMinimos(minimos.length > 0);
+        setStockOk(true);
+      })
+      .catch(() => {
+        if (!vigente) return;
+        setAlertasStock([]); setHayMinimos(false); setStockOk(false);
+      });
     return () => { vigente = false; };
   }, []);
 
@@ -323,7 +358,7 @@ export default function DashboardPanel({ sucursales = [], visitas = [], onVerSuc
       )}
 
       <Alertas alertas={avisos} hayStock={alertasStock.length > 0}/>
-      <AlertasStock alertas={alertasStock}/>
+      {stockOk && <AlertasStock alertas={alertasStock} hayMinimos={hayMinimos}/>}
       <ResumenSemanal resumen={resumen}/>
       {cumpl.hayPlan && <CumplimientoPlan cumpl={cumpl}/>}
       <TablaSemaforo filas={filas} onVerSucursal={onVerSucursal}/>
