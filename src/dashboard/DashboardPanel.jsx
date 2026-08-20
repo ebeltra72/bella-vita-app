@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { T, F } from "../theme";
 import { API } from "../api";
-import { fmtFecha, fmtHora, mesActual } from "../utils";
+import { diasDesde, fmtFecha, fmtHora, mesActual } from "../utils";
 import { cumplimientoPlan, nombreMes } from "../plan/datos";
 import { Badge, Card } from "../ui";
 import {
@@ -61,8 +61,10 @@ function ResumenSemanal({ resumen }) {
 }
 
 // ─── Alertas ─────────────────────────────────────────────────────────────────
-function Alertas({ alertas }) {
-  if (alertas.length === 0) return (
+function Alertas({ alertas, hayStock }) {
+  // El "todo al día" mira también el stock: sin esto quedaría un cartel verde
+  // justo encima del bloque rojo de productos bajo mínimo.
+  if (alertas.length === 0 && !hayStock) return (
     <Card style={{ background:T.sageBg, border:`1px solid ${T.sage}33` }}>
       <div style={{ display:"flex", alignItems:"center", gap:9 }}>
         <span style={{ fontSize:20 }}>✨</span>
@@ -75,6 +77,8 @@ function Alertas({ alertas }) {
       </div>
     </Card>
   );
+
+  if (alertas.length === 0) return null;
 
   return (
     <>
@@ -107,6 +111,50 @@ function Alertas({ alertas }) {
         );
       })}
     </>
+  );
+}
+
+// ─── Alertas de stock ────────────────────────────────────────────────────────
+// Vienen derivadas del GET de inventarios y ya ordenadas por antigüedad: las
+// más viejas primero. No hay tabla de alertas ni botón de resolver — una alerta
+// desaparece cuando el control siguiente muestra el producto repuesto.
+//
+// La antigüedad es la del control que la detecta, no la de "cuándo empezó a
+// faltar": sin estado persistido no hay forma de saber lo segundo. En la
+// práctica ordena igual, porque el control más viejo es el que lleva más tiempo
+// sin corregirse.
+function AlertasStock({ alertas }) {
+  if (alertas.length === 0) return null;
+
+  return (
+    <Card style={{ background:T.errorBg, border:`1px solid ${T.error}44` }}>
+      <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:10 }}>
+        <span style={{ fontSize:17 }}>📦</span>
+        <span style={{ fontSize:14, fontWeight:700, color:T.error }}>
+          {alertas.length} {alertas.length === 1 ? "producto bajo mínimo" : "productos bajo mínimo"}
+        </span>
+      </div>
+
+      <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+        {alertas.map(a => (
+          <div key={`${a.sucursalId}-${a.producto}`} style={{
+            display:"flex", alignItems:"center", justifyContent:"space-between", gap:10,
+            background:T.white, borderRadius:12, padding:"9px 12px",
+          }}>
+            <div style={{ minWidth:0 }}>
+              <div style={{ fontSize:13, fontWeight:600, color:T.text }}>{a.producto}</div>
+              <div style={{ fontSize:11, color:T.muted, marginTop:2 }}>
+                {a.sucursalNombre} · {textoAntiguedad(diasDesde(a.fecha))}
+              </div>
+            </div>
+            <span style={{ whiteSpace:"nowrap", flexShrink:0 }}>
+              <strong style={{ fontFamily:F.serif, fontSize:17, color:T.error }}>{a.cantidad}</strong>
+              <span style={{ fontSize:12, color:T.muted }}> de {a.minimo}</span>
+            </span>
+          </div>
+        ))}
+      </div>
+    </Card>
   );
 }
 
@@ -223,6 +271,7 @@ function TablaSemaforo({ filas, onVerSucursal }) {
 export default function DashboardPanel({ sucursales = [], visitas = [], onVerSucursal }) {
   const [pendientes, setPendientes] = useState([]);
   const [recorridas, setRecorridas] = useState([]);
+  const [alertasStock, setAlertasStock] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
 
@@ -247,6 +296,17 @@ export default function DashboardPanel({ sucursales = [], visitas = [], onVerSuc
     return () => { vigente = false; };
   }, []);
 
+  // Alertas de stock: producto por debajo del mínimo en el último control de su
+  // sucursal. Si falla o no hay mínimos definidos, el bloque no se muestra y el
+  // resto del dashboard funciona igual.
+  useEffect(() => {
+    let vigente = true;
+    API.getAlertasStock()
+      .then(rows => { if (vigente) setAlertasStock(rows); })
+      .catch(() => { if (vigente) setAlertasStock([]); });
+    return () => { vigente = false; };
+  }, []);
+
   if (cargando) return <div style={{ textAlign:"center", padding:40, color:T.muted }}>Cargando…</div>;
 
   const filas = filasSucursales(sucursales, visitas, pendientes);
@@ -262,7 +322,8 @@ export default function DashboardPanel({ sucursales = [], visitas = [], onVerSuc
         </div>
       )}
 
-      <Alertas alertas={avisos}/>
+      <Alertas alertas={avisos} hayStock={alertasStock.length > 0}/>
+      <AlertasStock alertas={alertasStock}/>
       <ResumenSemanal resumen={resumen}/>
       {cumpl.hayPlan && <CumplimientoPlan cumpl={cumpl}/>}
       <TablaSemaforo filas={filas} onVerSucursal={onVerSucursal}/>

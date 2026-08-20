@@ -194,6 +194,34 @@ export const API = {
     const r = await postPersonal({ accion: 'desactivar', id });
     return r.persona ? mapPersona(r.persona) : null;
   },
+
+  // ─── STOCK ─────────────────────────────────────────────────────────────────
+  // Los mínimos son la configuración; las alertas son una vista derivada de los
+  // últimos controles contra esos mínimos. No hay tabla de alertas ni botón de
+  // resolver: si el control siguiente muestra cantidad >= mínimo, la alerta
+  // deja de calcularse y desaparece.
+  async getMinimos() {
+    const r = await fetch('/api/stock');
+    if (!r.ok) throw new Error('Error al cargar los stock mínimos');
+    return (await r.json()).map(mapMinimo);
+  },
+
+  async definirMinimo({ producto, minimo }) {
+    const r = await postStock({ accion: 'definir', producto, minimo });
+    return r.minimo ? mapMinimo(r.minimo) : null;
+  },
+
+  async quitarMinimo(producto) {
+    const r = await postStock({ accion: 'quitar', producto });
+    return r.minimo ? mapMinimo(r.minimo) : null;
+  },
+
+  // Vienen ya ordenadas por antigüedad desde el servidor: las más viejas primero
+  async getAlertasStock() {
+    const r = await fetch('/api/inventarios?alertas=1');
+    if (!r.ok) throw new Error('Error al cargar las alertas de stock');
+    return (await r.json()).map(mapAlertaStock);
+  },
 };
 
 // ─── HELPERS DE RECORRIDAS ───────────────────────────────────────────────────
@@ -271,3 +299,33 @@ const CONTEXTO_PERSONAL = {
 
 const postPersonal = (body) =>
   post('/api/personal', body, CONTEXTO_PERSONAL[body.accion] || 'No se pudo guardar el plantel');
+
+// ─── HELPERS DE STOCK ────────────────────────────────────────────────────────
+// NUMERIC vuelve de Postgres como string ("10.00"): se normaliza a número acá
+// para que del otro lado se pueda comparar y formatear sin pensar en el tipo.
+function mapMinimo(m) {
+  return {
+    producto: m.producto,
+    minimo: Number(m.minimo),
+    creadoEn: m.creado_en,
+    actualizadoEn: m.actualizado_en,
+  };
+}
+
+function mapAlertaStock(a) {
+  return {
+    producto: a.producto,
+    sucursalId: a.sucursal_id,
+    sucursalNombre: a.sucursal_nombre,
+    rubro: a.rubro,
+    fecha: a.fecha?.slice(0, 10) || null,
+    cantidad: Number(a.cantidad),
+    minimo: Number(a.minimo),
+    inventarioId: a.inventario_id,
+  };
+}
+
+const postStock = (body) =>
+  post('/api/stock', body, body.accion === 'quitar'
+    ? 'No se pudo quitar el mínimo'
+    : 'No se pudo guardar el mínimo');
