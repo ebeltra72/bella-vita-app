@@ -3,23 +3,38 @@ import { T, F } from "../theme";
 import { RUBRO_ICONOS } from "../constants";
 import { API } from "../api";
 import { fmtFecha } from "../utils";
+import { Card } from "../ui";
 import MinimosPanel from "../stock/MinimosPanel";
 import { bajoMinimo, contarBajoMinimo, fmtCantidad, indexarMinimos } from "../stock/datos";
 
 const SUBTABS = [["controles","📋 Controles"],["minimos","🎯 Mínimos"]];
 
+// Cuánto falta para llegar al mínimo. Se redondea a dos decimales porque las
+// cantidades se cargan con step 0,5 y la resta en punto flotante puede dejar
+// colas como 9.499999999999998.
+const deficit = (a) => Math.round((Number(a.minimo) - Number(a.cantidad)) * 100) / 100;
+
 // ══════════════════════════════════════════════════════════════════════════════
 // PANEL ILEANA – INVENTARIO
 //
-// Dos solapas sobre los mismos datos: el historial de controles y la
-// configuración de mínimos que decide qué se pinta en rojo en ese historial. Los
-// mínimos viven acá y no dentro de MinimosPanel para que editarlos repinte los
-// controles al instante, sin recargar.
+// Dos secciones con jerarquía explícita:
+//
+//   1. Qué falta HOY. Se deriva del último control de cada producto en cada
+//      sucursal, ordenado por déficit: lo más urgente arriba.
+//   2. Qué se controló, cuándo y dónde. El historial completo, con filtros.
+//
+// La primera responde "qué compro"; la segunda, "qué pasó". Antes estaban
+// mezcladas y había que abrir control por control para enterarse de lo primero.
+//
+// Los mínimos viven acá y no dentro de MinimosPanel para que editarlos repinte
+// los controles al instante, sin recargar.
 // ══════════════════════════════════════════════════════════════════════════════
 export default function InventarioPanel() {
   const [vista, setVista] = useState("controles");
   const [inventarios, setInventarios] = useState([]);
   const [minimos, setMinimos] = useState([]);
+  const [alertas, setAlertas] = useState([]);
+  const [alertasError, setAlertasError] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [filtroSuc, setFiltroSuc] = useState("");
   const [filtroRubro, setFiltroRubro] = useState("");
@@ -48,7 +63,22 @@ export default function InventarioPanel() {
     API.getMinimos().then(setMinimos).catch(() => setMinimos([]));
   }, []);
 
+  // Las alertas vienen derivadas del servidor, ordenadas por antigüedad. Acá se
+  // reordenan por déficit, que es el orden de esta pantalla: no es "hace cuánto
+  // que falta" sino "cuánto falta".
+  useEffect(() => {
+    API.getAlertasStock()
+      .then(rows => { setAlertas(rows); setAlertasError(null); })
+      .catch(e => { setAlertas([]); setAlertasError(e.message || "No se pudieron cargar las alertas"); });
+  }, []);
+
   const porProducto = indexarMinimos(minimos);
+
+  const criticas = [...alertas].sort((a, b) => {
+    const d = deficit(b) - deficit(a);
+    if (d !== 0) return d;
+    return a.producto.localeCompare(b.producto, "es");
+  });
 
   const sucursalesUnicas = [...new Set(inventarios.map(i => i.sucursalNombre))].filter(Boolean);
   const rubrosUnicos = [...new Set(inventarios.map(i => i.rubro))].filter(Boolean);
@@ -87,8 +117,96 @@ export default function InventarioPanel() {
     <div style={{ padding:"18px 16px" }}>
       <SubTabs/>
 
+      {/* ══════════════════════════════════════════════════════════════════════
+          SECCIÓN 1 — ALERTAS DE STOCK
+          ══════════════════════════════════════════════════════════════════════ */}
+
+      {/* Si el pedido falló no se puede afirmar ninguna de las dos cosas: un
+          "todo sobre mínimo" en verde sería mentira, y un rojo también. */}
+      {alertasError && (
+        <Card style={{ background:T.amberBg, border:`1px solid ${T.amber}44` }}>
+          <div style={{ fontSize:13, color:T.text, lineHeight:1.5 }}>
+            ⚠ No se pudo calcular el stock bajo mínimo.
+            <div style={{ fontSize:11, color:T.muted2, marginTop:4 }}>{alertasError}</div>
+          </div>
+        </Card>
+      )}
+
+      {!alertasError && criticas.length === 0 && (
+        <Card style={{ background:T.sageBg, border:`1px solid ${T.sage}44` }}>
+          <div style={{ display:"flex", alignItems:"center", gap:9 }}>
+            <span style={{ fontSize:20 }}>✓</span>
+            <div>
+              <div style={{ fontSize:14, fontWeight:700, color:T.sage }}>Todo el stock sobre mínimo</div>
+              <div style={{ fontSize:12, color:T.muted, marginTop:2 }}>
+                {minimos.length === 0
+                  ? "Todavía no hay mínimos definidos: nada se está controlando."
+                  : `${minimos.length} ${minimos.length === 1 ? "producto controlado" : "productos controlados"} en las 7 sucursales.`}
+              </div>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {!alertasError && criticas.length > 0 && (
+        <Card style={{ background:T.errorBg, border:`1px solid ${T.error}44`, padding:16 }}>
+          <div style={{ fontFamily:F.serif, fontSize:21, fontWeight:700, color:T.error, marginBottom:3 }}>
+            ⚠ Productos bajo mínimo
+          </div>
+          <div style={{ fontSize:12, color:T.muted, marginBottom:12 }}>
+            {criticas.length} {criticas.length === 1 ? "producto" : "productos"} · el que más falta, primero
+          </div>
+
+          <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+            {criticas.map(a => (
+              <div key={`${a.sucursalId}-${a.producto}`} style={{
+                display:"flex", alignItems:"center", justifyContent:"space-between", gap:10,
+                background:T.white, borderRadius:12, padding:"10px 12px",
+              }}>
+                <div style={{ minWidth:0 }}>
+                  <div style={{ fontSize:13, fontWeight:700, color:T.text }}>{a.producto}</div>
+                  <div style={{ fontSize:11, color:T.muted, marginTop:2 }}>
+                    📍 {a.sucursalNombre} · {fmtFecha(a.fecha)}
+                  </div>
+                </div>
+
+                <div style={{ display:"flex", alignItems:"center", gap:10, flexShrink:0 }}>
+                  <div style={{ textAlign:"right" }}>
+                    <div style={{ fontFamily:F.serif, fontSize:17, fontWeight:700, color:T.error, lineHeight:1 }}>
+                      {fmtCantidad(a.cantidad)}
+                    </div>
+                    <div style={{ fontSize:10, color:T.muted, marginTop:3 }}>
+                      mín. {fmtCantidad(a.minimo)}
+                    </div>
+                  </div>
+                  <span style={{
+                    background:T.errorBg, color:T.error, borderRadius:9, padding:"5px 9px",
+                    fontSize:13, fontWeight:700, fontFamily:F.serif, whiteSpace:"nowrap",
+                  }}>
+                    −{fmtCantidad(deficit(a))}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          SECCIÓN 2 — HISTORIAL DE CONTROLES
+          ══════════════════════════════════════════════════════════════════════ */}
+
+      <div style={{ margin:"22px 0 12px" }}>
+        <div style={{ fontFamily:F.serif, fontSize:21, fontWeight:700, color:T.primaryDeep }}>
+          Historial de controles
+        </div>
+        <div style={{ fontSize:12, color:T.muted, marginTop:2 }}>
+          Tocá un control para ver las cantidades cargadas
+        </div>
+      </div>
+
       {/* Resumen */}
-      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:16 }}>
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:14 }}>
         <div style={{ background:T.card, borderRadius:14, padding:"14px 12px", textAlign:"center", boxShadow:T.shadowCard }}>
           <div style={{ fontFamily:F.serif, fontSize:28, fontWeight:700, color:T.primaryDeep }}>{inventarios.length}</div>
           <div style={{ fontSize:11, color:T.muted, fontWeight:600, textTransform:"uppercase", letterSpacing:"0.5px" }}>Controles</div>
@@ -117,6 +235,8 @@ export default function InventarioPanel() {
         const open = expandido === inv.id;
         const productos = inv.productos || {};
         const cantProductos = Object.keys(productos).length;
+        // El borde marca que ESE control tuvo faltantes, que no es lo mismo que
+        // la sección de arriba: ahí está el estado de hoy, acá el de ese día.
         const bajos = contarBajoMinimo(productos, porProducto);
 
         return (
@@ -124,23 +244,22 @@ export default function InventarioPanel() {
             background:T.card, borderRadius:16, boxShadow:T.shadowList, marginBottom:10, overflow:"hidden",
             borderLeft: bajos > 0 ? `4px solid ${T.error}` : "4px solid transparent",
           }}>
-            <div style={{ padding:"13px 16px", cursor:"pointer", display:"flex", justifyContent:"space-between", alignItems:"center" }}
+            <div style={{ padding:"13px 16px", cursor:"pointer", display:"flex", justifyContent:"space-between", alignItems:"center", gap:10 }}
               onClick={() => setExpandido(open ? null : inv.id)}>
-              <div>
-                <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:2 }}>
-                  <span style={{ fontSize:16 }}>{RUBRO_ICONOS[inv.rubro] || "📦"}</span>
-                  <span style={{ fontWeight:700, fontSize:14, color:T.text }}>{inv.rubro}</span>
+              <div style={{ minWidth:0 }}>
+                <div style={{ display:"flex", alignItems:"center", gap:7, marginBottom:3 }}>
+                  <span style={{ fontSize:13 }}>📍</span>
+                  <span style={{ fontFamily:F.serif, fontSize:17, fontWeight:700, color:T.primaryDeep }}>
+                    {inv.sucursalNombre}
+                  </span>
                 </div>
-                <div style={{ fontSize:12, color:T.muted }}>
-                  {inv.sucursalNombre} · {fmtFecha(inv.fecha)} · {cantProductos} productos
+                <div style={{ display:"flex", alignItems:"center", gap:6, fontSize:12, color:T.muted, marginLeft:20 }}>
+                  <span style={{ fontSize:14 }}>{RUBRO_ICONOS[inv.rubro] || "📦"}</span>
+                  <span style={{ fontWeight:600, color:T.text }}>{inv.rubro}</span>
+                  <span>· {fmtFecha(inv.fecha)} · {cantProductos} productos</span>
                 </div>
-                {bajos > 0 && (
-                  <div style={{ fontSize:12, color:T.error, fontWeight:700, marginTop:3 }}>
-                    ⚠ {bajos} bajo mínimo
-                  </div>
-                )}
               </div>
-              <span style={{ color:T.muted2 }}>{open ? "▲" : "▼"}</span>
+              <span style={{ color:T.muted2, flexShrink:0 }}>{open ? "▲" : "▼"}</span>
             </div>
 
             {open && (
