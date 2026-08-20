@@ -36,6 +36,7 @@ export default function InventarioPanel() {
   const [alertas, setAlertas] = useState([]);
   const [alertasError, setAlertasError] = useState(null);
   const [cargando, setCargando] = useState(true);
+  const [foco, setFoco] = useState(null);          // sucursalId con el detalle abierto
   const [filtroSuc, setFiltroSuc] = useState("");
   const [filtroRubro, setFiltroRubro] = useState("");
   const [expandido, setExpandido] = useState(null);
@@ -79,6 +80,20 @@ export default function InventarioPanel() {
     if (d !== 0) return d;
     return a.producto.localeCompare(b.producto, "es");
   });
+
+  // Nivel 1 del mapa: una tarjeta por sucursal con faltantes. Un listado plano
+  // de 52 productos no se lee — la primera pregunta es dónde, y recién después
+  // qué. Como `criticas` ya viene ordenado por déficit, el primer item de cada
+  // grupo es su peor faltante y el orden de las sucursales sale solo.
+  const grupos = [];
+  for (const a of criticas) {
+    let g = grupos.find(x => String(x.sucursalId) === String(a.sucursalId));
+    if (!g) { g = { sucursalId: a.sucursalId, sucursalNombre: a.sucursalNombre, items: [] }; grupos.push(g); }
+    g.items.push(a);
+  }
+
+  // Si la sucursal enfocada se quedó sin faltantes, se vuelve al mapa solo
+  const grupoFoco = foco === null ? null : grupos.find(g => String(g.sucursalId) === String(foco)) || null;
 
   const sucursalesUnicas = [...new Set(inventarios.map(i => i.sucursalNombre))].filter(Boolean);
   const rubrosUnicos = [...new Set(inventarios.map(i => i.rubro))].filter(Boolean);
@@ -148,25 +163,78 @@ export default function InventarioPanel() {
         </Card>
       )}
 
-      {!alertasError && criticas.length > 0 && (
+      {/* ─── NIVEL 1: mapa de sucursales ───────────────────────────────────── */}
+      {!alertasError && criticas.length > 0 && !grupoFoco && (
         <Card style={{ background:T.errorBg, border:`1px solid ${T.error}44`, padding:16 }}>
           <div style={{ fontFamily:F.serif, fontSize:21, fontWeight:700, color:T.error, marginBottom:3 }}>
-            ⚠ Productos bajo mínimo
+            ⚠ {criticas.length} {criticas.length === 1 ? "producto bajo mínimo" : "productos bajo mínimo"}
           </div>
           <div style={{ fontSize:12, color:T.muted, marginBottom:12 }}>
-            {criticas.length} {criticas.length === 1 ? "producto" : "productos"} · el que más falta, primero
+            el que más falta, primero · tocá una sucursal para ver el detalle
           </div>
 
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
+            {grupos.map(g => {
+              const peor = g.items[0];
+              return (
+                <button key={g.sucursalId} onClick={() => setFoco(g.sucursalId)} style={{
+                  display:"flex", flexDirection:"column", alignItems:"flex-start", gap:6,
+                  background:T.white, border:"none", borderRadius:14, padding:"12px 13px",
+                  cursor:"pointer", textAlign:"left", fontFamily:F.body, width:"100%",
+                }}>
+                  <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:8, width:"100%" }}>
+                    <span style={{ fontSize:13, fontWeight:700, color:T.text, minWidth:0 }}>
+                      {g.sucursalNombre}
+                    </span>
+                    <span style={{
+                      background:T.error, color:T.white, borderRadius:20, padding:"2px 9px",
+                      fontSize:12, fontWeight:700, flexShrink:0,
+                    }}>{g.items.length}</span>
+                  </div>
+
+                  <div style={{ fontSize:11, color:T.muted, lineHeight:1.35, minWidth:0 }}>
+                    {peor.producto}
+                    <span style={{ color:T.error, fontWeight:700 }}> −{fmtCantidad(deficit(peor))}</span>
+                    {g.items.length > 1 && (
+                      <span style={{ color:T.muted2 }}>
+                        {" "}y {g.items.length - 1} más
+                      </span>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </Card>
+      )}
+
+      {/* ─── NIVEL 2: detalle de una sucursal ──────────────────────────────── */}
+      {!alertasError && grupoFoco && (
+        <Card style={{ background:T.errorBg, border:`1px solid ${T.error}44`, padding:16 }}>
+          <button onClick={() => setFoco(null)} style={{
+            display:"flex", alignItems:"center", gap:7, background:"none", border:"none",
+            padding:0, marginBottom:12, cursor:"pointer", fontFamily:F.body, textAlign:"left",
+          }}>
+            <span style={{ fontSize:16, color:T.error }}>←</span>
+            <span style={{ fontSize:13, color:T.muted, fontWeight:600 }}>
+              ⚠ Bajo mínimo
+              <span style={{ color:T.muted2 }}> → </span>
+              <span style={{ fontFamily:F.serif, fontSize:17, fontWeight:700, color:T.error }}>
+                {grupoFoco.sucursalNombre}
+              </span>
+            </span>
+          </button>
+
           <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
-            {criticas.map(a => (
-              <div key={`${a.sucursalId}-${a.producto}`} style={{
+            {grupoFoco.items.map(a => (
+              <div key={a.producto} style={{
                 display:"flex", alignItems:"center", justifyContent:"space-between", gap:10,
                 background:T.white, borderRadius:12, padding:"10px 12px",
               }}>
                 <div style={{ minWidth:0 }}>
                   <div style={{ fontSize:13, fontWeight:700, color:T.text }}>{a.producto}</div>
                   <div style={{ fontSize:11, color:T.muted, marginTop:2 }}>
-                    📍 {a.sucursalNombre} · {fmtFecha(a.fecha)}
+                    Último control · {fmtFecha(a.fecha)}
                   </div>
                 </div>
 
