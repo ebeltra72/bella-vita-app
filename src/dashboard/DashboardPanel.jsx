@@ -61,17 +61,24 @@ function ResumenSemanal({ resumen }) {
 }
 
 // ─── Alertas ─────────────────────────────────────────────────────────────────
-function Alertas({ alertas, hayStock }) {
+function Alertas({ alertas, hayStock, stockLimpio }) {
   // El "todo al día" mira también el stock: sin esto quedaría un cartel verde
-  // justo encima del bloque rojo de productos bajo mínimo.
+  // justo encima del bloque rojo de productos bajo mínimo. Y cuando además el
+  // stock está limpio, lo dice acá en vez de dejar una segunda tarjeta verde:
+  // el estado limpio es uno solo, no uno por subsistema.
   if (alertas.length === 0 && !hayStock) return (
     <Card style={{ background:T.sageBg, border:`1px solid ${T.sage}33` }}>
       <div style={{ display:"flex", alignItems:"center", gap:9 }}>
         <span style={{ fontSize:20 }}>✨</span>
         <div>
           <div style={{ fontSize:14, fontWeight:700, color:T.sage }}>Todo al día</div>
+          {/* Una sola expresión y no texto JSX interpolado: JSX borra el salto
+              de línea que queda entre {expr} y el texto siguiente en vez de
+              convertirlo en espacio, y la frase salía pegada. */}
           <div style={{ fontSize:12, color:T.muted }}>
-            Sin pendientes vencidos y todas las sucursales visitadas en los últimos {DIAS_VISITA_RECIENTE} días.
+            {`Sin pendientes vencidos${stockLimpio ? "," : " y"} todas las sucursales `
+              + `visitadas en los últimos ${DIAS_VISITA_RECIENTE} días`
+              + `${stockLimpio ? " y todo el stock sobre mínimo" : ""}.`}
           </div>
         </div>
       </div>
@@ -123,10 +130,15 @@ function Alertas({ alertas, hayStock }) {
 // Las alertas se derivan del GET de inventarios: no hay tabla ni botón de
 // resolver, una alerta desaparece cuando el control siguiente muestra el
 // producto repuesto.
-function AlertasStock({ alertas, hayMinimos }) {
+function AlertasStock({ alertas, hayMinimos, absorbido }) {
   // Sin mínimos definidos no hay nada que afirmar: ni que falta stock ni que
   // está todo bien. El bloque no aparece hasta que haya algo configurado.
   if (!hayMinimos) return null;
+
+  // Con todo lo demás en verde, el "Todo al día" general ya lo dice. Esta
+  // tarjeta queda sólo para el caso mixto: hay pendientes vencidos o sucursales
+  // sin visitar, pero el stock está bien y vale la pena decirlo.
+  if (alertas.length === 0 && absorbido) return null;
 
   if (alertas.length === 0) return (
     <Card style={{ background:T.sageBg, border:`1px solid ${T.sage}33` }}>
@@ -357,8 +369,18 @@ export default function DashboardPanel({ sucursales = [], visitas = [], onVerSuc
         </div>
       )}
 
-      <Alertas alertas={avisos} hayStock={alertasStock.length > 0}/>
-      {stockOk && <AlertasStock alertas={alertasStock} hayMinimos={hayMinimos}/>}
+      <Alertas
+        alertas={avisos}
+        hayStock={alertasStock.length > 0}
+        stockLimpio={stockOk && hayMinimos && alertasStock.length === 0}
+      />
+      {stockOk && (
+        <AlertasStock
+          alertas={alertasStock}
+          hayMinimos={hayMinimos}
+          absorbido={avisos.length === 0}
+        />
+      )}
       <ResumenSemanal resumen={resumen}/>
       {cumpl.hayPlan && <CumplimientoPlan cumpl={cumpl}/>}
       <TablaSemaforo filas={filas} onVerSucursal={onVerSucursal}/>
