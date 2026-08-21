@@ -222,6 +222,55 @@ export const API = {
     if (!r.ok) throw new Error('Error al cargar las alertas de stock');
     return (await r.json()).map(mapAlertaStock);
   },
+
+  // ─── NIZA ──────────────────────────────────────────────────────────────────
+  // Los productos Niza se revenden, no se consumen: lo que se carga en la visita
+  // son unidades vendidas desde la visita anterior.
+  async getVentasNiza({ sucursalId, mes } = {}) {
+    const qs = new URLSearchParams();
+    if (sucursalId != null) qs.set('sucursal_id', sucursalId);
+    if (mes)                qs.set('mes', mes);
+    const r = await fetch('/api/niza' + (qs.toString() ? `?${qs}` : ''));
+    if (!r.ok) throw new Error('Error al cargar las ventas de Niza');
+    return (await r.json()).map(mapVentaNiza);
+  },
+
+  // Total por producto del mes, con el desglose por sucursal adentro
+  async getResumenNiza(mes) {
+    const r = await fetch(`/api/niza?resumen=1&mes=${encodeURIComponent(mes)}`);
+    if (!r.ok) throw new Error('Error al cargar el resumen de Niza');
+    return (await r.json()).map(p => ({
+      producto: p.producto,
+      unidades: p.unidades,
+      sucursales: (p.sucursales || []).map(s => ({
+        sucursalId: s.sucursal_id,
+        sucursalNombre: s.sucursal_nombre,
+        unidades: s.unidades,
+      })),
+    }));
+  },
+
+  // Lo cargado en una visita ya guardada. Durante la visita en curso las ventas
+  // viven en memoria, así que esto sólo hace falta para revisarlas después.
+  async getVentasNizaVisita(visitaId) {
+    const r = await fetch(`/api/niza?visita_id=${encodeURIComponent(visitaId)}`);
+    if (!r.ok) throw new Error('Error al cargar las ventas de la visita');
+    return (await r.json()).map(mapVentaNiza);
+  },
+
+  // La lista es el estado final de esa visita, no un agregado: el producto que
+  // no viene se borra. Por eso sirve igual para la carga y para una edición, y
+  // reintentar el check-out no suma las ventas dos veces.
+  async registrarVentasNiza({ visitaId, sucursalId, sucursalNombre, fecha, ventas }) {
+    return postNiza({
+      accion: 'registrar_ventas',
+      visita_id: visitaId,
+      sucursal_id: sucursalId,
+      sucursal_nombre: sucursalNombre,
+      fecha,
+      ventas: ventas || [],
+    });
+  },
 };
 
 // ─── HELPERS DE RECORRIDAS ───────────────────────────────────────────────────
@@ -329,3 +378,19 @@ const postStock = (body) =>
   post('/api/stock', body, body.accion === 'quitar'
     ? 'No se pudo quitar el mínimo'
     : 'No se pudo guardar el mínimo');
+
+// ─── HELPERS DE NIZA ─────────────────────────────────────────────────────────
+function mapVentaNiza(v) {
+  return {
+    visitaId: v.visita_id,
+    sucursalId: v.sucursal_id,
+    sucursalNombre: v.sucursal_nombre,
+    producto: v.producto,
+    unidades: Number(v.unidades),
+    fecha: v.fecha?.slice(0, 10) || null,
+    creadoEn: v.creado_en,
+  };
+}
+
+const postNiza = (body) =>
+  post('/api/niza', body, 'No se pudieron guardar las ventas de Niza');

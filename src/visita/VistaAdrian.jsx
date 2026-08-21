@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { T, F } from "../theme";
-import { RADIO_ACEPTADO_M } from "../constants";
+import { CATALOGO, RADIO_ACEPTADO_M, RUBRO_NIZA } from "../constants";
 import { API } from "../api";
 import { distanciaM, fechaLocal, fmtHora, fmtFecha, useGPS } from "../utils";
 import { Badge, Btn, Card, Label, Select } from "../ui";
@@ -9,6 +9,7 @@ import { descripcionSugerida, hallazgos as calcularHallazgos, resumenEncuesta } 
 import InventarioForm from "./InventarioForm";
 import PendientesPrevios from "./PendientesPrevios";
 import PresenciaPersonal from "./PresenciaPersonal";
+import NizaVentas, { ventasParaGuardar } from "./NizaVentas";
 import CierreVisita, { faltantesCierre, dejoPendientes } from "./CierreVisita";
 import PendienteForm from "./PendienteForm";
 import MisRecorridas from "../plan/MisRecorridas";
@@ -20,12 +21,17 @@ const CIERRE_VACIO = {
 // ══════════════════════════════════════════════════════════════════════════════
 // VISTA ADRIÁN
 //
-//   inicio ─check-in─► pendientes ─► presencia ─► encuesta ─► cierre ─check-out─► listo
+//   inicio ─check-in─► pendientes ─► presencia ─► encuesta ─► inventario ─►
+//   niza ─► cierre ─check-out─► listo
 //
 // Todo lo que se genera durante la visita (respuestas, presencia del personal,
-// pendientes nuevos y resoluciones de pendientes viejos) vive en memoria y se
-// persiste recién en el check-out. Una visita abandonada a mitad no deja nada
-// suelto en la base.
+// ventas de Niza, pendientes nuevos y resoluciones de pendientes viejos) vive en
+// memoria y se persiste recién en el check-out. Una visita abandonada a mitad no
+// deja nada suelto en la base.
+//
+// La excepción es el control de inventario, que guarda al toque: es de antes y
+// su tabla no tiene FK contra visitas, así que no depende de que la visita
+// exista. Por eso vive en su propia fase y no arrastra estado hasta el cierre.
 // ══════════════════════════════════════════════════════════════════════════════
 export default function VistaAdrian({ sucursales, equipo, visitas, setVisitas }) {
   const [fase, setFase] = useState("inicio");
@@ -39,6 +45,10 @@ export default function VistaAdrian({ sucursales, equipo, visitas, setVisitas })
   const [cargandoPersonal, setCargandoPersonal] = useState(false);
   const [presentes, setPresentes] = useState([]);
   const [presenciaConfirmada, setPresenciaConfirmada] = useState(false);
+
+  // Ventas de Niza: { producto: "3" }, con los blancos ausentes del objeto
+  const [ventasNiza, setVentasNiza] = useState({});
+  const [nizaConfirmada, setNizaConfirmada] = useState(false);
 
   // Pendientes: los que ya existían, lo que Adrián hizo con ellos, y los nuevos
   const [pendientesPrevios, setPendientesPrevios] = useState([]);
@@ -62,6 +72,11 @@ export default function VistaAdrian({ sucursales, equipo, visitas, setVisitas })
   const resumen = resumenEncuesta(respuestas);
   const hallazgos = calcularHallazgos(respuestas);
   const resueltos = Object.values(resoluciones).filter(r => r.estado === "resuelto").length;
+
+  // La línea Niza sale del catálogo. Si todavía no está cargada, la pantalla de
+  // Niza lo avisa y deja seguir: el paso es opcional.
+  const productosNiza = CATALOGO[RUBRO_NIZA] || [];
+  const unidadesNiza = ventasParaGuardar(ventasNiza).reduce((a, v) => a + v.unidades, 0);
 
   // Cuántos pendientes abiertos tiene la sucursal elegida, antes del check-in
   useEffect(() => {
@@ -91,6 +106,8 @@ export default function VistaAdrian({ sucursales, equipo, visitas, setVisitas })
     setResoluciones({});
     setPresentes([]);
     setPresenciaConfirmada(false);
+    setVentasNiza({});
+    setNizaConfirmada(false);
     setCierre(CIERRE_VACIO);
     setErrorGuardado(null);
     setPorGuardar(null);
@@ -150,6 +167,20 @@ export default function VistaAdrian({ sucursales, equipo, visitas, setVisitas })
       // check-out la deja igual en vez de duplicarla.
       await API.registrarPresencia({ visitaId: fin.id, personas: presentes });
 
+      // Sólo si Adrián cargó algo: el paso es opcional y así una visita sin
+      // Niza no toca el endpoint. La lista es el estado final de la visita, así
+      // que reintentar el check-out no suma las ventas dos veces.
+      const ventas = ventasParaGuardar(ventasNiza);
+      if (ventas.length > 0) {
+        await API.registrarVentasNiza({
+          visitaId: fin.id,
+          sucursalId: fin.sucursalId,
+          sucursalNombre: fin.sucursalNombre,
+          fecha: fechaLocal(fin.checkin),
+          ventas,
+        });
+      }
+
       if (pendientesNuevos.length > 0) {
         await API.crearPendientes(pendientesNuevos.map(p => ({ ...p, visitaId: fin.id })));
       }
@@ -202,6 +233,7 @@ export default function VistaAdrian({ sucursales, equipo, visitas, setVisitas })
     setFase("inicio"); setSucursalId(""); setSinPermiso(false);
     setPendientesPrevios([]); setPendientesNuevos([]); setResoluciones({});
     setPresentes([]); setPresenciaConfirmada(false);
+    setVentasNiza({}); setNizaConfirmada(false);
     setCierre(CIERRE_VACIO); setErrorGuardado(null); setPorGuardar(null);
     setAvisoVinculo(null);
   };
@@ -328,6 +360,7 @@ export default function VistaAdrian({ sucursales, equipo, visitas, setVisitas })
           {pendientesNuevos.length > 0 && <><br/>Se crearon {pendientesNuevos.length} {pendientesNuevos.length === 1 ? "pendiente" : "pendientes"}.</>}
           {resueltos > 0 && <><br/>Se cerraron {resueltos} {resueltos === 1 ? "pendiente anterior" : "pendientes anteriores"}.</>}
           {presentes.length > 0 && <><br/>Se registró la presencia de {presentes.length} {presentes.length === 1 ? "persona" : "personas"}.</>}
+          {unidadesNiza > 0 && <><br/>Se registraron {unidadesNiza} {unidadesNiza === 1 ? "unidad" : "unidades"} de Niza.</>}
         </div>
         {avisoVinculo && (
           <div style={{
@@ -392,6 +425,22 @@ export default function VistaAdrian({ sucursales, equipo, visitas, setVisitas })
         onQuitarPendiente={quitarPendiente}
       />
 
+      <Btn onClick={() => setFase("inventario")}>Continuar al inventario →</Btn>
+      <Btn variant="ghost" onClick={() => setFase("presencia")} style={{ marginTop:8 }}>
+        ← Volver a presencia
+      </Btn>
+
+      {modal}
+    </div>
+  );
+
+  // ─── FASE: INVENTARIO ──────────────────────────────────────────────────────
+  // A diferencia del resto, InventarioForm guarda al toque: su tabla es de antes
+  // y no tiene FK contra visitas, así que no necesita esperar al check-out.
+  if (fase === "inventario") return (
+    <div style={{ padding:"18px 16px" }}>
+      <Cabecera/>
+
       <Card>
         <div style={{ fontWeight:700, fontSize:14, color:T.primaryDeep, marginBottom:14 }}>
           📦 Control de inventario
@@ -399,12 +448,28 @@ export default function VistaAdrian({ sucursales, equipo, visitas, setVisitas })
         <InventarioForm visitaActual={visitaActual} inventariosExistentes={inventariosVisita}/>
       </Card>
 
-      <Btn onClick={() => setFase("cierre")}>Continuar al cierre →</Btn>
-      <Btn variant="ghost" onClick={() => setFase("presencia")} style={{ marginTop:8 }}>
-        ← Volver a presencia
+      <Btn onClick={() => setFase("niza")}>Continuar a Niza →</Btn>
+      <Btn variant="ghost" onClick={() => setFase("encuesta")} style={{ marginTop:8 }}>
+        ← Volver a la encuesta
       </Btn>
+    </div>
+  );
 
-      {modal}
+  // ─── FASE: NIZA ────────────────────────────────────────────────────────────
+  // Opcional: si Adrián no carga nada, salta al cierre sin bloquear. No todas
+  // las sucursales tienen la línea.
+  if (fase === "niza") return (
+    <div style={{ padding:"18px 16px" }}>
+      <Cabecera/>
+      <NizaVentas
+        productos={productosNiza}
+        ventas={ventasNiza}
+        setVentas={setVentasNiza}
+        confirmada={nizaConfirmada}
+        onConfirmar={() => { setNizaConfirmada(true); setFase("cierre"); }}
+        onOmitir={() => { setNizaConfirmada(false); setFase("cierre"); }}
+        onVolver={() => setFase("inventario")}
+      />
     </div>
   );
 
@@ -426,7 +491,7 @@ export default function VistaAdrian({ sucursales, equipo, visitas, setVisitas })
           pendientesResueltos={resueltos}
           onCrearPendiente={abrirFormDesdeCierre}
           onQuitarPendiente={quitarPendiente}
-          onVolver={() => setFase("encuesta")}
+          onVolver={() => setFase("niza")}
         />
 
         <ErrorGPS/>
@@ -447,8 +512,8 @@ export default function VistaAdrian({ sucursales, equipo, visitas, setVisitas })
           </Btn>
         ))}
 
-        <Btn variant="ghost" onClick={() => setFase("encuesta")} style={{ marginTop:8 }}>
-          ← Volver a la encuesta
+        <Btn variant="ghost" onClick={() => setFase("niza")} style={{ marginTop:8 }}>
+          ← Volver a Niza
         </Btn>
 
         {modal}

@@ -12,6 +12,7 @@ import PlanPanel from "./plan/PlanPanel";
 import HistorialPanel from "./paneles/HistorialPanel";
 import PendientesPanel from "./paneles/PendientesPanel";
 import CoberturaPanel from "./paneles/CoberturaPanel";
+import NizaPanel from "./paneles/NizaPanel";
 import GestionComercialPanel from "./paneles/GestionComercialPanel";
 import EncuestaPanel from "./paneles/EncuestaPanel";
 import SucursalesPanel from "./paneles/SucursalesPanel";
@@ -50,7 +51,7 @@ export default function App() {
     setTabIleana("historial");
   };
 
-  const TABS   = [["dashboard","📊 Dashboard"],["plan","🗓 Plan"],["historial","📋 Visitas"],["cobertura","👥 Cobertura"],["pendientes","⚠ Pendientes"],["gestion","💜 Comercial"],["inventario","📦 Stock"],["encuesta","📝 Encuesta"],["sucursales","📍 Sucursales"],["km","🚗 Km"],["miembros","👥 Equipo"]];
+  const TABS   = [["dashboard","📊 Dashboard"],["plan","🗓 Plan"],["historial","📋 Visitas"],["cobertura","👥 Cobertura"],["pendientes","⚠ Pendientes"],["gestion","💜 Comercial"],["inventario","📦 Stock"],["niza","🧴 Niza"],["encuesta","📝 Encuesta"],["sucursales","📍 Sucursales"],["km","🚗 Km"],["miembros","👥 Equipo"]];
 
   return (
     <div style={{ minHeight:"100vh", background:T.bgApp, fontFamily:F.body, color:T.text, WebkitFontSmoothing:"antialiased" }}>
@@ -111,6 +112,7 @@ export default function App() {
           {tabIleana==="sucursales" && <SucursalesPanel sucursales={sucursales} setSucursales={setSucursales}/>}
           {tabIleana==="km"         && <KmPanel visitas={visitas}/>}
           {tabIleana==="inventario"  && <InventarioPanel/>}
+          {tabIleana==="niza"        && <NizaPanel visitas={visitas}/>}
           {tabIleana==="miembros"    && <MiembrosPanel equipo={equipo} setEquipo={setEquipo}/>}
         </>
       )}

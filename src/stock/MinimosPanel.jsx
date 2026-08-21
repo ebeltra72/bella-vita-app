@@ -5,7 +5,10 @@ import { API } from "../api";
 import { Btn, BtnSm, Card } from "../ui";
 import { indexarMinimos, rubroDe } from "./datos";
 
-const RUBROS = Object.keys(CATALOGO);
+// Los rubros sin productos no se muestran: una tarjeta que abre una lista vacía
+// no es una opción, es un callejón. Hoy aplica a "Productos Niza", que existe en
+// CATALOGO pero todavía no tiene cargada la lista de la línea.
+const RUBROS = Object.keys(CATALOGO).filter(r => (CATALOGO[r] || []).length > 0);
 
 // ══════════════════════════════════════════════════════════════════════════════
 // PANEL ILEANA – STOCK MÍNIMOS

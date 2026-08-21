@@ -57,6 +57,22 @@ export const CATALOGO = {
     "Máscara Vit C", "Crema antiage radiofrecuencia", "Protector solar",
     "Acnex Depure", "Serum Hialurónico c/Niacinamida", "Ac. Glicólico", "Ac. Lactobiónico",
   ],
+
+  // ⚠ PENDIENTE: falta la lista de productos de la línea Niza.
+  //
+  // Niza Científica es un laboratorio que Bella Vita revende, así que estos
+  // productos se VENDEN y no se consumen como los otros cuatro rubros. Los
+  // nombres de acá son la clave con la que se agregan las ventas en
+  // niza_ventas.producto: una vez que se carguen no se pueden renombrar sin
+  // dejar huérfano el historial, igual que pasa con los stock_minimos.
+  //
+  // Hasta que se completen, la pantalla de Niza de la visita avisa que el
+  // catálogo está vacío y el panel de Ileana no tiene qué mostrar. Nada más
+  // depende de esto: la tabla, la function y las dos pantallas ya funcionan.
+  //
+  // Ojo: este rubro NO entra en la rotación semanal del inventario, que tiene
+  // su propio array de cuatro en utils.js → rubroSemanaActual().
+  "Productos Niza": [],
 };
 
 export const RUBRO_ICONOS = {
@@ -64,7 +80,13 @@ export const RUBRO_ICONOS = {
   "Depilación": "✨",
   "Médico": "💉",
   "Limpiezas y masajes": "🧴",
+  "Productos Niza": "🧴",
 };
+
+// El rubro de Niza, aparte, porque lo usan la pantalla de ventas de la visita y
+// el panel de Ileana. El string tiene que coincidir exacto con la clave de
+// CATALOGO y con el título de la sección 6 de la encuesta.
+export const RUBRO_NIZA = "Productos Niza";
 
 // ─── PENDIENTES ──────────────────────────────────────────────────────────────
 // Los `id` son exactamente los valores que aceptan los CHECK de la tabla
