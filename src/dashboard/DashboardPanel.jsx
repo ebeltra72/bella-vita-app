@@ -69,7 +69,7 @@ function Alertas({ alertas, hayStock, stockLimpio }) {
   if (alertas.length === 0 && !hayStock) return (
     <Card style={{ background:T.sageBg, border:`1px solid ${T.sage}33` }}>
       <div style={{ display:"flex", alignItems:"center", gap:9 }}>
-        <span style={{ fontSize:20 }}>✨</span>
+        <span style={{ fontSize:20 }}>✓</span>
         <div>
           <div style={{ fontSize:14, fontWeight:700, color:T.sage }}>Todo al día</div>
           {/* Una sola expresión y no texto JSX interpolado: JSX borra el salto
