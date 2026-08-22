@@ -61,7 +61,7 @@ export default function App() {
           <div style={{ display:"flex", alignItems:"center", gap:10 }}>
             <img src={LOGO_SRC} alt="Bella Vita" style={{ width:38, height:38, borderRadius:11, objectFit:"cover", boxShadow:"0 2px 8px rgba(180,130,100,0.18)" }}/>
             <div>
-              <div style={{ fontFamily:F.logo, fontSize:23, fontWeight:600, color:T.coralLogo, lineHeight:1 }}>Bella Vita</div>
+              <div style={{ fontFamily:F.logo, fontSize:23, fontWeight:700, color:T.coralLogo, lineHeight:1 }}>Bella Vita</div>
               <div style={{ fontSize:10, fontWeight:600, color:T.muted2, textTransform:"uppercase", letterSpacing:"2px" }}>Gestión Comercial</div>
             </div>
           </div>
@@ -83,7 +83,7 @@ export default function App() {
 
       {cargando && (
         <div style={{ textAlign:"center", padding:48, color:T.muted }}>
-          <div style={{ fontFamily:F.serif, fontSize:20, marginBottom:8 }}>Cargando…</div>
+          <div style={{ fontSize:20, fontWeight:400, marginBottom:8 }}>Cargando…</div>
         </div>
       )}
 
