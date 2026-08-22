@@ -9,6 +9,7 @@ import {
   agruparPorSemana, cobertura, cumplimientoPlan, estadoDerivado,
   mesAnterior, mesSiguiente, nombreMes,
 } from "./datos";
+import { construirIcs, exportables, nombreArchivo } from "./ics";
 
 const diaCorto = (fecha) =>
   new Date(`${fecha}T00:00:00`).toLocaleDateString("es-AR", { weekday:"short", day:"numeric" });
@@ -26,6 +27,7 @@ export default function PlanPanel({ sucursales = [] }) {
   const [ocupado, setOcupado] = useState(null);
   const [reprogramando, setReprogramando] = useState(null);   // id
   const [borrador, setBorrador] = useState({ fechaPlan:"", motivo:"" });
+  const [exportado, setExportado] = useState(false);
 
   const cargar = (m = mes) => {
     setCargando(true); setError(null);
@@ -38,6 +40,23 @@ export default function PlanPanel({ sucursales = [] }) {
   useEffect(() => { cargar(mes); }, [mes]);
 
   const reemplazar = (r) => setRecorridas(prev => prev.map(x => x.id === r.id ? { ...r, visitaProbable: null } : x));
+
+  // El .ics se arma en el navegador y se baja como archivo: no hay endpoint ni
+  // sincronización con Google. La descarga se dispara con un <a> temporal, que
+  // es lo único que funciona igual en Safari de iOS y en Chrome de escritorio.
+  const exportarIcs = () => {
+    const texto = construirIcs(recorridas, mes);
+    const url = URL.createObjectURL(new Blob([texto], { type: "text/calendar;charset=utf-8" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = nombreArchivo(mes);
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    // Sin el revoke el blob queda retenido hasta que se cierre la pestaña
+    URL.revokeObjectURL(url);
+    setExportado(true);
+  };
 
   const aprobar = async () => {
     setOcupado("aprobar"); setError(null);
@@ -86,6 +105,7 @@ export default function PlanPanel({ sucursales = [] }) {
   const sinAprobar = recorridas.filter(r => !r.aprobado && r.estado !== "cancelada").length;
   const aprobadoEn = recorridas.find(r => r.aprobadoEn)?.aprobadoEn;
   const visibles = semanaFiltro ? semanas.filter(s => s.clave === semanaFiltro) : semanas;
+  const exportablesDelMes = exportables(recorridas).length;
 
   return (
     <div style={{ padding:"18px 16px" }}>
@@ -194,6 +214,32 @@ export default function PlanPanel({ sucursales = [] }) {
                 {ocupado === "aprobar" ? "Aprobando…" : `Aprobar plan de ${nombreMes(mes)}`}
               </Btn>
             </>
+          )}
+        </Card>
+
+        {/* Exportar a calendario */}
+        <Card>
+          <div style={{ fontSize:13, color:T.text, marginBottom:4, fontWeight:700 }}>
+            🗓 Exportar a Google Calendar
+          </div>
+          <div style={{ fontSize:12, color:T.muted, lineHeight:1.5, marginBottom:12 }}>
+            {exportablesDelMes === 0
+              ? "No hay recorridas para exportar en este mes."
+              : <>Baja un archivo <code style={{ background:T.cardSoft, padding:"1px 5px", borderRadius:4 }}>.ics</code> con {exportablesDelMes} {exportablesDelMes === 1 ? "recorrida" : "recorridas"}. Las canceladas quedan afuera.</>}
+          </div>
+
+          <Btn variant="ghost" disabled={exportablesDelMes === 0} onClick={exportarIcs}>
+            ⬇ Descargar .ics de {nombreMes(mes)}
+          </Btn>
+
+          {/* Google no importa un .ics solo por bajarlo. Sin este renglón, el
+              botón parece roto: el archivo se descarga y no pasa nada. */}
+          {exportado && (
+            <div style={{ background:T.sageBg, borderRadius:11, padding:"11px 13px", marginTop:10, fontSize:12, color:T.text, lineHeight:1.55 }}>
+              <strong style={{ color:T.sage }}>Archivo descargado.</strong> Para verlo en el
+              calendario: abrí Google Calendar en la computadora y entrá a
+              <strong> Configuración → Importar y exportar → Importar</strong>, y elegí el archivo.
+            </div>
           )}
         </Card>
 
