@@ -98,7 +98,7 @@ export default function App({ rol }) {
             <img src={LOGO_SRC} alt="Bella Vita" style={{ width:38, height:38, borderRadius:11, objectFit:"cover", boxShadow:"0 2px 8px rgba(180,130,100,0.18)" }}/>
             <div>
               <div style={{ fontFamily:F.logo, fontSize:23, fontWeight:700, color:T.coralLogo, lineHeight:1 }}>Bella Vita</div>
-              <div style={{ fontSize:10, fontWeight:600, color:T.muted2, textTransform:"uppercase", letterSpacing:"2px" }}>Gestión Comercial</div>
+              <div style={{ fontSize:10, fontWeight:600, color:T.muted2, letterSpacing:"2px" }}>Gestión Operativa</div>
             </div>
           </div>
           <UserButton/>
