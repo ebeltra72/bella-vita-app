@@ -26,7 +26,7 @@ export default function Login() {
           <div style={{ fontFamily:F.logo, fontSize:28, fontWeight:700, color:T.coralLogo, lineHeight:1.1 }}>
             Bella Vita
           </div>
-          <div style={{ fontSize:11, fontWeight:600, color:T.muted2, textTransform:"uppercase", letterSpacing:"2px", marginTop:4 }}>
+          <div style={{ fontSize:11, fontWeight:600, color:T.muted2, letterSpacing:"2px", marginTop:4 }}>
             Gestión Operativa
           </div>
         </div>
