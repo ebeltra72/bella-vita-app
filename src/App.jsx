@@ -20,6 +20,22 @@ import KmPanel from "./paneles/KmPanel";
 import InventarioPanel from "./paneles/InventarioPanel";
 import MiembrosPanel from "./paneles/MiembrosPanel";
 
+// ─── MÓDULO DE GESTIÓN COMERCIAL DEL EQUIPO ──────────────────────────────────
+// Oculto, no borrado. Apaga tres entradas de navegación y sus tres pantallas:
+//
+//   · la vista "💼 Equipo" del header (VistaEquipo)
+//   · la pestaña "💜 Comercial" de Ileana (GestionComercialPanel)
+//   · la pestaña "👥 Equipo" de Ileana (MiembrosPanel)
+//
+// Los componentes, los imports, el estado (equipo, registros, meta) y el fetch
+// de registros quedan intactos: poner esto en true devuelve el módulo entero
+// exactamente como estaba, sin tocar nada más.
+//
+// El fetch de registros sigue haciéndose aunque nadie lo muestre. Es un pedido
+// de más por carga, y sacarlo haría que el interruptor ya no alcance para
+// restaurar el módulo.
+const MODULO_EQUIPO = false;
+
 // ══════════════════════════════════════════════════════════════════════════════
 // ROOT
 // ══════════════════════════════════════════════════════════════════════════════
@@ -45,13 +61,24 @@ export default function App() {
       .finally(()=>setCargando(false));
   }, []);
 
-  const VISTAS = [["adrian","🗺 Adrián"],["equipo","💼 Equipo"],["ileana","👩‍💼 Ileana"]];
+  const VISTAS = [
+    ["adrian","🗺 Adrián"],
+    ...(MODULO_EQUIPO ? [["equipo","💼 Equipo"]] : []),
+    ["ileana","👩‍💼 Ileana"],
+  ];
   const verSucursal = (nombre) => {
     setFoco(f => ({ sucursal: nombre, n: (f?.n ?? 0) + 1 }));
     setTabIleana("historial");
   };
 
-  const TABS   = [["dashboard","📊 Dashboard"],["plan","🗓 Plan"],["historial","📋 Visitas"],["cobertura","👥 Cobertura"],["pendientes","⚠ Pendientes"],["gestion","💜 Comercial"],["inventario","📦 Stock"],["niza","🧴 Niza"],["encuesta","📝 Encuesta"],["sucursales","📍 Sucursales"],["km","🚗 Km"],["miembros","👥 Equipo"]];
+  const TABS   = [
+    ["dashboard","📊 Dashboard"],["plan","🗓 Plan"],["historial","📋 Visitas"],
+    ["cobertura","👥 Cobertura"],["pendientes","⚠ Pendientes"],
+    ...(MODULO_EQUIPO ? [["gestion","💜 Comercial"]] : []),
+    ["inventario","📦 Stock"],["niza","🧴 Niza"],["encuesta","📝 Encuesta"],
+    ["sucursales","📍 Sucursales"],["km","🚗 Km"],
+    ...(MODULO_EQUIPO ? [["miembros","👥 Equipo"]] : []),
+  ];
 
   return (
     <div style={{ minHeight:"100vh", background:T.bgApp, fontFamily:F.body, color:T.text, WebkitFontSmoothing:"antialiased" }}>
@@ -88,7 +115,7 @@ export default function App() {
       )}
 
       {!cargando && vista==="adrian" && <VistaAdrian sucursales={sucursales} equipo={equipo} visitas={visitas} setVisitas={setVisitas}/>}
-      {!cargando && vista==="equipo" && <VistaEquipo equipo={equipo} registros={registros} setRegistros={setRegistros} meta={meta}/>}
+      {MODULO_EQUIPO && !cargando && vista==="equipo" && <VistaEquipo equipo={equipo} registros={registros} setRegistros={setRegistros} meta={meta}/>}
       {!cargando && vista==="ileana" && (
         <>
           <div style={{ background:T.white, borderBottom:`1px solid ${T.divider}`, padding:"0 14px", display:"flex", gap:2, overflowX:"auto", position:"sticky", top:84, zIndex:99 }}>
@@ -107,13 +134,13 @@ export default function App() {
           {tabIleana==="historial"  && <HistorialPanel visitas={visitas} preguntas={preguntas} foco={foco}/>}
           {tabIleana==="cobertura"  && <CoberturaPanel/>}
           {tabIleana==="pendientes" && <PendientesPanel sucursales={sucursales} equipo={equipo}/>}
-          {tabIleana==="gestion"    && <GestionComercialPanel registros={registros} equipo={equipo} meta={meta} setMeta={setMeta}/>}
+          {MODULO_EQUIPO && tabIleana==="gestion"    && <GestionComercialPanel registros={registros} equipo={equipo} meta={meta} setMeta={setMeta}/>}
           {tabIleana==="encuesta"   && <EncuestaPanel/>}
           {tabIleana==="sucursales" && <SucursalesPanel sucursales={sucursales} setSucursales={setSucursales}/>}
           {tabIleana==="km"         && <KmPanel visitas={visitas}/>}
           {tabIleana==="inventario"  && <InventarioPanel/>}
           {tabIleana==="niza"        && <NizaPanel visitas={visitas}/>}
-          {tabIleana==="miembros"    && <MiembrosPanel equipo={equipo} setEquipo={setEquipo}/>}
+          {MODULO_EQUIPO && tabIleana==="miembros"    && <MiembrosPanel equipo={equipo} setEquipo={setEquipo}/>}
         </>
       )}
     </div>
