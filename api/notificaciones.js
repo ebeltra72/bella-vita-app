@@ -166,13 +166,13 @@ function responderHtml(res, html) {
 const paginaSinAlertas = () => `<!doctype html>
 <html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Bella Vita · Sin alertas</title></head>
-<body style="margin:0;background:#F7F1EA;font-family:Arial,Helvetica,sans-serif;">
-  <div style="max-width:460px;margin:60px auto;background:#FFFFFF;border:1px solid #EADFD5;border-radius:16px;padding:32px;text-align:center;">
-    <div style="font-size:34px;line-height:1;">✓</div>
-    <div style="font-family:Georgia,serif;font-size:22px;font-weight:600;color:#7C9070;margin-top:12px;">
+<body style="margin:0;background:#F8F5F2;font-family:'Inter',-apple-system,sans-serif;">
+  <div style="max-width:460px;margin:60px auto;background:#FFFFFF;border:1px solid #EDE8E4;border-radius:16px;padding:32px;text-align:center;">
+    <div style="font-size:34px;line-height:1;color:#7A9070;">✓</div>
+    <div style="font-size:22px;font-weight:700;color:#7A9070;margin-top:12px;">
       Todo al día
     </div>
-    <div style="font-size:14px;color:#A18C82;line-height:1.55;margin-top:8px;">
+    <div style="font-size:14px;color:#9A8C89;line-height:1.55;margin-top:8px;">
       No hay pendientes vencidos, ni productos bajo mínimo, ni sucursales sin
       visitar. Hoy no se enviaría ningún mail.
     </div>

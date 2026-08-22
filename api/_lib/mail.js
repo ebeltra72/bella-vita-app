@@ -5,21 +5,31 @@ const TZ = 'America/Argentina/Buenos_Aires';
 // La paleta de la app, copiada como literales: un mail no puede importar
 // src/theme.js —es del bundle del cliente— y los clientes de correo no soportan
 // variables CSS. Si cambia la paleta de la app, esto se actualiza a mano.
+//
+// Los nombres mapean uno a uno contra los tokens de T en src/theme.js:
+// fondo=bgApp, texto=text, suave=muted, tenue=muted2, marca=primary,
+// borde=border, linea=divider.
 const C = {
-  fondo:   '#F7F1EA',
+  fondo:   '#F8F5F2',
   card:    '#FFFFFF',
-  texto:   '#3B2E29',
-  suave:   '#A18C82',
-  tenue:   '#B9A597',
-  marca:   '#A9695C',
-  error:   '#BE6B5B',
-  errorBg: '#F7E9E5',
-  ambar:   '#B98A4E',
+  texto:   '#2C2320',
+  suave:   '#9A8C89',
+  tenue:   '#B8AAA7',
+  marca:   '#B5737A',
+  error:   '#B85C5C',
+  errorBg: '#F7E8E8',
+  ambar:   '#B08A4E',
   ambarBg: '#F6EEE0',
-  salvia:  '#7C9070',
-  borde:   '#EADFD5',
-  linea:   '#F1E9E2',
+  salvia:  '#7A9070',
+  salviaBg:'#EBF0E8',
+  borde:   '#EDE8E4',
+  linea:   '#F3EEEB',
 };
+
+// Inter no va a cargar: los clientes de correo no bajan webfonts. El stack está
+// para que caiga en la fuente de sistema de cada plataforma, que es lo más
+// parecido a Inter que se consigue en un mail.
+const FUENTE = "'Inter', -apple-system, sans-serif";
 
 // Todo lo que entra al HTML pasa por acá. Descripciones de pendientes, nombres
 // de productos y de sucursales son texto libre cargado desde el celular: un
@@ -126,31 +136,31 @@ export function plantillaResumen({ alertas, appUrl, fecha }) {
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;">
 
         <tr><td style="padding:0 0 20px;">
-          <div style="font-family:Georgia,'Times New Roman',serif;font-size:26px;font-weight:600;color:${C.marca};line-height:1.1;">
+          <div style="font-family:${FUENTE};font-size:26px;font-weight:700;color:${C.marca};line-height:1.1;">
             Bella Vita
           </div>
-          <div style="font-family:Arial,Helvetica,sans-serif;font-size:11px;font-weight:600;color:${C.tenue};letter-spacing:2px;text-transform:uppercase;margin-top:3px;">
+          <div style="font-family:${FUENTE};font-size:11px;font-weight:600;color:${C.tenue};letter-spacing:2px;text-transform:uppercase;margin-top:3px;">
             Resumen del día · ${esc(fecha)}
           </div>
         </td></tr>
 
-        <tr><td style="font-family:Arial,Helvetica,sans-serif;padding:0 0 18px;font-size:14px;color:${C.suave};line-height:1.5;">
+        <tr><td style="font-family:${FUENTE};padding:0 0 18px;font-size:14px;color:${C.suave};line-height:1.5;">
           ${alertas.total} ${alertas.total === 1 ? 'cosa requiere atención' : 'cosas requieren atención'} hoy.
         </td></tr>
 
-        <tr><td><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-family:Arial,Helvetica,sans-serif;">
+        <tr><td><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-family:${FUENTE};">
           ${secVencidos}
           ${secStock}
           ${secVisitas}
         </table></td></tr>
 
         <tr><td align="center" style="padding:8px 0 0;">
-          <a href="${esc(appUrl)}" style="display:inline-block;background:${C.marca};color:#ffffff;font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:700;text-decoration:none;padding:13px 28px;border-radius:12px;">
+          <a href="${esc(appUrl)}" style="display:inline-block;background:${C.marca};color:#ffffff;font-family:${FUENTE};font-size:14px;font-weight:700;text-decoration:none;padding:13px 28px;border-radius:12px;">
             Abrir el tablero →
           </a>
         </td></tr>
 
-        <tr><td align="center" style="padding:20px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:${C.tenue};line-height:1.5;">
+        <tr><td align="center" style="padding:20px 0 0;font-family:${FUENTE};font-size:11px;color:${C.tenue};line-height:1.5;">
           Este resumen se envía automáticamente cada mañana,<br>
           y solo cuando hay algo que reportar.
         </td></tr>
