@@ -1,8 +1,11 @@
 import { useState, useEffect } from "react";
+import { UserButton } from "@clerk/react";
 import { LOGO_SRC, T, F } from "./theme";
 import { SUCURSALES_INIT, PREGUNTAS_INIT, EQUIPO_INIT, META_INIT } from "./constants";
 import { API } from "./api";
 import { useLocalStorage } from "./utils";
+
+import { vistaInicial, vistasDe } from "./auth/roles";
 
 import VistaAdrian from "./visita/VistaAdrian";
 import VistaEquipo from "./VistaEquipo";
@@ -39,8 +42,11 @@ const MODULO_EQUIPO = false;
 // ══════════════════════════════════════════════════════════════════════════════
 // ROOT
 // ══════════════════════════════════════════════════════════════════════════════
-export default function App() {
-  const [vista, setVista] = useState("adrian");
+export default function App({ rol }) {
+  // Cada uno arranca donde trabaja: Adrián en su vista, Ileana y el admin en el
+  // tablero. El estado inicial se calcula una sola vez —la función va como
+  // inicializador perezoso— porque el rol no cambia mientras dure la sesión.
+  const [vista, setVista] = useState(() => vistaInicial(rol));
   const [tabIleana, setTabIleana] = useState("dashboard");
   // Foco que el Dashboard le pasa a Visitas al tocar una sucursal.
   // El contador `n` permite reaplicarlo aunque se toque la misma dos veces.
@@ -61,11 +67,14 @@ export default function App() {
       .finally(()=>setCargando(false));
   }, []);
 
+  // Dos filtros independientes sobre la misma lista: qué existe (MODULO_EQUIPO)
+  // y qué le corresponde a este rol.
+  const permitidas = vistasDe(rol);
   const VISTAS = [
     ["adrian","🗺 Adrián"],
     ...(MODULO_EQUIPO ? [["equipo","💼 Equipo"]] : []),
     ["ileana","👩‍💼 Ileana"],
-  ];
+  ].filter(([v]) => permitidas.includes(v));
   const verSucursal = (nombre) => {
     setFoco(f => ({ sucursal: nombre, n: (f?.n ?? 0) + 1 }));
     setTabIleana("historial");
@@ -92,8 +101,11 @@ export default function App() {
               <div style={{ fontSize:10, fontWeight:600, color:T.muted2, textTransform:"uppercase", letterSpacing:"2px" }}>Gestión Comercial</div>
             </div>
           </div>
+          <UserButton/>
         </div>
-        {/* Main tabs */}
+        {/* Main tabs. Con una sola vista habilitada no hay nada que elegir: el
+            selector se esconde en vez de mostrar un botón único siempre activo. */}
+        {VISTAS.length > 1 && (
         <div style={{ display:"flex", gap:6 }}>
           {VISTAS.map(([v,l])=>(
             <button key={v} onClick={()=>setVista(v)} style={{
@@ -106,6 +118,7 @@ export default function App() {
             }}>{l}</button>
           ))}
         </div>
+        )}
       </div>
 
       {cargando && (
