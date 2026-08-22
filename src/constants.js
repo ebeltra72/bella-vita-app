@@ -58,21 +58,33 @@ export const CATALOGO = {
     "Acnex Depure", "Serum Hialurónico c/Niacinamida", "Ac. Glicólico", "Ac. Lactobiónico",
   ],
 
-  // ⚠ PENDIENTE: falta la lista de productos de la línea Niza.
+  // Línea SKINCARE del sistema de Poli. Niza Científica es un laboratorio que
+  // Bella Vita revende, así que estos productos se VENDEN además de contarse:
+  // son el catálogo de la pantalla de ventas de la visita y del panel de Niza.
   //
-  // Niza Científica es un laboratorio que Bella Vita revende, así que estos
-  // productos se VENDEN y no se consumen como los otros cuatro rubros. Los
-  // nombres de acá son la clave con la que se agregan las ventas en
-  // niza_ventas.producto: una vez que se carguen no se pueden renombrar sin
-  // dejar huérfano el historial, igual que pasa con los stock_minimos.
+  // Los nombres son la clave con la que se agregan las ventas en
+  // niza_ventas.producto y los mínimos en stock_minimos.producto. Renombrar uno
+  // acá deja huérfano su historial en las dos tablas: para eso está el bloque
+  // "Fuera del catálogo" del panel de Mínimos.
   //
-  // Hasta que se completen, la pantalla de Niza de la visita avisa que el
-  // catálogo está vacío y el panel de Ileana no tiene qué mostrar. Nada más
-  // depende de esto: la tabla, la function y las dos pantallas ya funcionan.
-  //
-  // Ojo: este rubro NO entra en la rotación semanal del inventario, que tiene
-  // su propio array de cuatro en utils.js → rubroSemanaActual().
-  "Productos Niza": [],
+  // Los "(gabinete)" son presentaciones de uso interno del mismo producto y van
+  // como ítems aparte a propósito: se cuentan y se venden por separado.
+  "Productos Niza": [
+    "3 D Oxygen 60 g",
+    "Aqua Bomb Light",
+    "Aqua Bomb Light (gabinete)",
+    "Barrier Repair 45",
+    "Glycolic 30 g",
+    "Glycolic 30 g (gabinete)",
+    "Lactobionic 30 g",
+    "Lactobionic 30 g (gabinete)",
+    "Loción Descongestiva",
+    "Niacinamide 30 g",
+    "Niacinamide 30 g (gabinete)",
+    "Relief Aveno Cream 60 g",
+    "Retinol 30 g",
+    "Tranexamic 30 g",
+  ],
 };
 
 export const RUBRO_ICONOS = {

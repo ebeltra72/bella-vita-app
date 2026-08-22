@@ -112,12 +112,22 @@ export function useGPS() {
 }
 
 // ─── INVENTARIO: rubro rotativo por semana ───────────────────────────────────
-// Calcula qué rubro corresponde esta semana del mes (1-4)
+// Calcula qué rubro corresponde esta semana del mes.
+//
+// El módulo va contra rubros.length y no contra un 4 escrito a mano: con el
+// número fijo, sumar un quinto rubro lo dejaba en un índice inalcanzable y el
+// cambio no hacía nada.
+//
+// ⚠ La semana del mes va de 1 a 5, pero la quinta son sólo los días 29 a 31, así
+// que el quinto rubro toca 3 días por mes y ninguno en febrero. Los otros cuatro
+// conservan exactamente la semana que tenían. Si Niza necesita el mismo peso que
+// el resto, hay que rotar por semana corrida del año —como semanaKey()— en vez
+// de por semana del mes, y eso mueve el calendario de los otros cuatro.
 export function rubroSemanaActual() {
   const hoyDate = new Date();
   const semanaDelMes = Math.ceil(hoyDate.getDate() / 7);
-  const rubros = ["General", "Depilación", "Médico", "Limpiezas y masajes"];
-  return rubros[(semanaDelMes - 1) % 4];
+  const rubros = ["General", "Depilación", "Médico", "Limpiezas y masajes", "Productos Niza"];
+  return rubros[(semanaDelMes - 1) % rubros.length];
 }
 
 export function semanaKey() {
