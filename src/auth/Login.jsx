@@ -27,7 +27,7 @@ export default function Login() {
             Bella Vita
           </div>
           <div style={{ fontSize:11, fontWeight:600, color:T.muted2, textTransform:"uppercase", letterSpacing:"2px", marginTop:4 }}>
-            Gestión Comercial
+            Gestión Operativa
           </div>
         </div>
       </div>
